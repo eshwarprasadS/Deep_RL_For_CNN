@@ -2,6 +2,7 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
+from gym.spaces.dynamic import Dynamic
 
 class StarWarsEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -20,8 +21,8 @@ class StarWarsEnv(gym.Env):
             }
         )
 
-        # We have 4 actions, corresponding to "right", "up", "left", "down"
-        self.action_space = spaces.Discrete(4)
+        # We have 4 actions, corresponding to 0: "right", 1: "up", 2: "left", 3: "down"
+        self.action_space = Dynamic(4)
 
         """
         The following dictionary maps abstract actions from `self.action_space` to 
@@ -29,10 +30,10 @@ class StarWarsEnv(gym.Env):
         I.e. 0 corresponds to "right", 1 to "up" etc.
         """
         self._action_to_direction = {
-            0: np.array([1, 0]),
-            1: np.array([0, 1]),
-            2: np.array([-1, 0]),
-            3: np.array([0, -1]),
+            0: np.array([0, 1]),
+            1: np.array([-1, 0]),
+            2: np.array([0, -1]),
+            3: np.array([1, 0]),
         }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -55,6 +56,21 @@ class StarWarsEnv(gym.Env):
         return {"c3po_distance": np.linalg.norm(self._agent_location - self._target_location, ord=1),
                 "vader_distance": np.linalg.norm(self._agent_location - self._enemy_location, ord=1)}
 
+    def adjust_action_space(self):
+        # Disable actions that would move the agent off the grid
+        actions = []
+        self.action_space.enable_actions()
+        if self._agent_location[0] == self.size - 1:
+            actions.append(0)
+        if self._agent_location[1] == 0:
+            actions.append(1)
+        if self._agent_location[0] == 0:
+            actions.append(2)
+        if self._agent_location[1] == self.size - 1:
+            actions.append(3)
+        self.action_space.disable_actions(actions)
+        # return self.action_space.available_actions
+
     def reset(self, seed=None, options=None):
         # Seed self.np_random
         super().reset(seed=seed)
@@ -75,6 +91,9 @@ class StarWarsEnv(gym.Env):
                 0, self.size, size=2, dtype=int
             )
 
+        #adjust action space according to r2d2's location
+        self.adjust_action_space()    
+
         observation = self._get_obs()
         info = self._get_info()
 
@@ -90,6 +109,8 @@ class StarWarsEnv(gym.Env):
         self._agent_location = np.clip(
             self._agent_location + direction, 0, self.size - 1
         )
+        #adjust action space according to r2d2's location
+        self.adjust_action_space()
         terminated = False
         # An episode is done if r2d2 found c3po or effing DIED to vader
         won = np.array_equal(self._agent_location, self._target_location)
