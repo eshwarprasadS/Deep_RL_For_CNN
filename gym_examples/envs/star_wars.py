@@ -22,7 +22,7 @@ class StarWarsEnv(gym.Env):
         )
 
         # We have 4 actions, corresponding to 0: "right", 1: "up", 2: "left", 3: "down"
-        self.action_space = Dynamic(4)
+        self.action_space = spaces.Discrete(4)
 
         """
         The following dictionary maps abstract actions from `self.action_space` to 
@@ -56,19 +56,24 @@ class StarWarsEnv(gym.Env):
         return {"c3po_distance": np.linalg.norm(self._agent_location - self._target_location, ord=1),
                 "vader_distance": np.linalg.norm(self._agent_location - self._enemy_location, ord=1)}
 
-    def adjust_action_space(self):
+    def get_valid_action_mask(self):
         # Disable actions that would move the agent off the grid
-        actions = []
-        self.action_space.enable_actions()
+        invalid_actions = []
+        # self.action_space.enable_actions()
         if self._agent_location[1] == self.size - 1:
-            actions.append(0)
+            invalid_actions.append(0)
         if self._agent_location[0] == 0:
-            actions.append(1)
+            invalid_actions.append(1)
         if self._agent_location[1] == 0:
-            actions.append(2)
+            invalid_actions.append(2)
         if self._agent_location[0] == self.size - 1:
-            actions.append(3)
-        self.action_space.disable_actions(actions)
+            invalid_actions.append(3)
+        
+        mask = np.ones(self.action_space.n, dtype=np.int8)
+        mask[invalid_actions] = 0
+
+        return mask
+        # self.action_space.disable_actions(actions)
         # return self.action_space.available_actions
 
     def reset(self, seed=None, options=None):
@@ -92,7 +97,7 @@ class StarWarsEnv(gym.Env):
             )
 
         #adjust action space according to r2d2's location
-        self.adjust_action_space()    
+        # self.adjust_action_space()    
 
         observation = self._get_obs()
         info = self._get_info()
@@ -110,7 +115,7 @@ class StarWarsEnv(gym.Env):
             self._agent_location + direction, 0, self.size - 1
         )
         #adjust action space according to r2d2's location
-        self.adjust_action_space()
+        # self.adjust_action_space()
         terminated = False
         # An episode is done if r2d2 found c3po or effing DIED to vader
         won = np.array_equal(self._agent_location, self._target_location)

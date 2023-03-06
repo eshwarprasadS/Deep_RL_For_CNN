@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 
-class Dynamic(gym.Space):
+class Dynamic(gym.spaces.Discrete):
     def __init__(self, max_space):
         self.n = max_space
         self.availabe_actions = list(range(0, max_space))

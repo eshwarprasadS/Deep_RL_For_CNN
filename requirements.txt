@@ -33,7 +33,10 @@ python-dateutil==2.8.2
 pytz==2022.7.1
 pywin32==305
 pyzmq==25.0.0
+sb3-contrib==1.7.0
 six==1.16.0
+stable-baselines3 @ git+https://github.com/carlosluis/stable-baselines3@51ffad20053eddcdbb2e612531ca0208eee5f9fe
+torch==1.13.1
 tornado==6.2
 traitlets==5.9.0
 typing-extensions==4.5.0
