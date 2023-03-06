@@ -60,13 +60,13 @@ class StarWarsEnv(gym.Env):
         # Disable actions that would move the agent off the grid
         actions = []
         self.action_space.enable_actions()
-        if self._agent_location[0] == self.size - 1:
-            actions.append(0)
-        if self._agent_location[1] == 0:
-            actions.append(1)
-        if self._agent_location[0] == 0:
-            actions.append(2)
         if self._agent_location[1] == self.size - 1:
+            actions.append(0)
+        if self._agent_location[0] == 0:
+            actions.append(1)
+        if self._agent_location[1] == 0:
+            actions.append(2)
+        if self._agent_location[0] == self.size - 1:
             actions.append(3)
         self.action_space.disable_actions(actions)
         # return self.action_space.available_actions
