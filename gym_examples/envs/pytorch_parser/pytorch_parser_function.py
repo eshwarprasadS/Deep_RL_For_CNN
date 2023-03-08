@@ -23,11 +23,11 @@ from torchvision.transforms import ToTensor
 
 torch.manual_seed(1)
 
-device=torch.device(0)
+# device=torch.device(0)
 # print(device)
 
 # device='cuda'
-
+device = 'cpu'
 #take a tuple
 # layer_type=None,        # String -- conv, pool, fc, softmax
 # layer_depth=None,       # Current depth of network
@@ -129,10 +129,11 @@ class GenerateCNN(nn.Module):
       
       return x
 
-def generate_and_train(model_architecture, train_data, test_data, input_channels=1, lr=0.01,num_epochs=5):
+def generate_and_train(model_architecture, train_data, test_data, input_channels=1, lr=0.01, num_epochs=5, verbose = False):
 
   model = GenerateCNN(model_architecture, input_channels)
-  print(model)
+  if verbose:
+    print(model)
   model.to(device)
 
   loaders = {
@@ -153,7 +154,8 @@ def generate_and_train(model_architecture, train_data, test_data, input_channels
 
 
   model.train()
-  print("TRAINING")
+  if verbose:
+    print("TRAINING")
   # Train the model
   total_step = len(loaders['train'])
       
@@ -177,12 +179,14 @@ def generate_and_train(model_architecture, train_data, test_data, input_channels
           # apply gradients             
           optimizer.step()                
           
-          if (i+1) % 100 == 0:
-              print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+          if verbose:
+            if (i+1) % 100 == 0:
+                print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
 
   # Test the model
   model.eval()
-  print('TESTING')
+  if verbose:
+    print('TESTING')
   with torch.no_grad():
       correct = 0
       total = 0
@@ -194,8 +198,9 @@ def generate_and_train(model_architecture, train_data, test_data, input_channels
           pred_y = torch.max(test_output, 1)[1].data.squeeze()
           accuracy += (pred_y == labels).sum().item()
           total+=float(labels.size(0))
-          
-  print('Test Accuracy of the model on the 10000 test images: %.4f' % (accuracy/total))
+
+  if verbose:        
+    print('Test Accuracy of the model on the 10000 test images: %.4f' % (accuracy/total))
   return accuracy/total
 
 # https://medium.com/@nutanbhogendrasharma/pytorch-convolutional-neural-network-with-mnist-dataset-4e8a4265e118
