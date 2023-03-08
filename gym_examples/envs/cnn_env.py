@@ -8,12 +8,14 @@ class StarWarsEnv(gym.Env):
 
     def __init__(self, render_mode=None):
 
+        self.layer_depth_limit = 8
+        self.layer_depth = 0
         self.observation_space = spaces.Dict(
             {
                 "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
-                "layer_depth": spaces.Discrete(12), # Current depth of network (12 layers max)
-                "filter_depth": spaces.Discrete(4), # Used for conv (64, 128, 256, 512)
-                "filter_size": spaces.Discrete(3), # Used for conv and pool (1,3,5)
+                "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
+                "filter_depth": spaces.Discrete(5), # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
+                "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
                 "fc_size": spaces.Discrete(4) # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
                 # "image_size": spaces.Discrete(4) # Used for any layer that maintains square input (conv and pool) returned in info dict
             }
@@ -21,17 +23,17 @@ class StarWarsEnv(gym.Env):
 
 
         #action space is a dictionary of the same size as the observation space
-        self.action_space = spaces.Dict(
-            {
-                "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
-                "layer_depth": spaces.Discrete(12), # Current depth of network (12 layers max)
-                "filter_depth": spaces.Discrete(4), # Used for conv (64, 128, 256, 512)
-                "filter_size": spaces.Discrete(3), # Used for conv and pool (1,3,5)
-                "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
-                "terminal": spaces.Discrete(2) # 0 if not terminal, 1 if terminal
-            }
-                 )
-
+        # self.action_space = spaces.Dict(
+        #     {
+        #         "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
+        #         "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
+        #         "filter_depth": spaces.Discrete(5), # Used for conv (64, 128, 256, 512) -- 0 is no filter
+        #         "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
+        #         "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+        #         "terminal": spaces.Discrete(2) # 0 if not terminal, 1 if terminal
+        #     }
+        #          )
+        self.action_space = spaces.MultiDiscrete([4, 8, 5, 4, 4, 2]) # 4, 8, 5, 4, 4, 2 corresponds to the number of discrete actions in each space
 
         self._discrete_to_layer_type = {    # Maps discrete action space to layer type
             0: "conv",
@@ -41,16 +43,18 @@ class StarWarsEnv(gym.Env):
         }
 
         self._discrete_to_filter_depth = {    # Maps discrete action space to filter depth
-            0: 64,
-            1: 128,
-            2: 256,
-            3: 512
+            0: 0,
+            1: 10,
+            2: 20,
+            3: 32,
+            4: 64
         }
 
         self._discrete_to_filter_size = {    # Maps discrete action space to filter size
-            0: 1,
-            1: 3,
-            2: 5
+            0: 0,
+            1: 1,
+            2: 3,
+            3: 5
         }
 
         self._discrete_to_fc_size = {    # Maps discrete action space to fc size
@@ -74,12 +78,40 @@ class StarWarsEnv(gym.Env):
         self.window = None
         self.clock = None
     
+    def get_valid_action_mask(self):
+        # # Disable actions that would move the agent off the grid
+        # invalid_actions = []
+
+        # create a mask representing valid actions in each dimension
+        md_mask = tuple([np.ones(x,) for x in self.action_space.nvec])
+
+        if self.layer_depth < self.layer_depth_limit-1:
+            pass
+        # # self.action_space.enable_actions()
+        # if self._agent_location[1] == self.size - 1:
+        #     invalid_actions.append(0)
+        # if self._agent_location[0] == 0:
+        #     invalid_actions.append(1)
+        # if self._agent_location[1] == 0:
+        #     invalid_actions.append(2)
+        # if self._agent_location[0] == self.size - 1:
+        #     invalid_actions.append(3)
+        else:
+            md_mask[5][0] = 0
+
+        # mask = np.ones(self.action_space.n, dtype=np.int8)
+        # mask[invalid_actions] = 0
+
+        return md_mask
+
     def _get_obs(self):
         return {"r2d2": self._agent_location, "c3po": self._target_location, "vader": self._enemy_location}
     
     def _get_info(self):
         return {"c3po_distance": np.linalg.norm(self._agent_location - self._target_location, ord=1),
                 "vader_distance": np.linalg.norm(self._agent_location - self._enemy_location, ord=1)}
+
+
 
     def reset(self, seed=None, options=None):
         # Seed self.np_random
@@ -110,7 +142,7 @@ class StarWarsEnv(gym.Env):
         return observation, info
     
     def step(self, action):
-    
+        self.layer_depth+=1
         direction = self._action_to_direction[action]
         # clip to the grid for bounds
         self._agent_location = np.clip(
