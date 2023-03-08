@@ -2,7 +2,9 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
-
+from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -10,6 +12,26 @@ class GridWorldEnv(gym.Env):
     def __init__(self, render_mode=None, size=5):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
+        
+        self.train_data = datasets.MNIST(
+                            root = 'data',
+                            train = True,                         
+                            transform = ToTensor(), 
+                            download = True,            
+                            )
+        self.test_data = datasets.MNIST(
+                            root = 'data', 
+                            train = False, 
+                            transform = ToTensor()
+                            )
+        
+        train_idx = (self.train_data.targets==0) | (self.train_data.targets==1) | (self.train_data.targets==2)
+        test_idx = (self.test_data.targets==0) | (self.test_data.targets==1) | (self.test_data.targets==2)
+
+        self.train_data.data = self.train_data.data[train_idx]
+        self.train_data.targets = self.train_data.targets[train_idx]
+        self.test_data.data = self.test_data.data[test_idx]
+        self.test_data.targets = self.test_data.targets[test_idx]
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
@@ -89,6 +111,14 @@ class GridWorldEnv(gym.Env):
         )
         # An episode is done iff the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
+        if terminated:
+            acc = generate_and_train([('conv',1,5,3,1,28,0,0,[]),
+                                      ('pool',1,0,2,2,28,0,0,[]),
+                                      ('conv',1,10,3,1,26,0,0,[]),
+                                      ('pool',1,0,2,2,28,0,0,[]),
+                                      ('fc',0,0,0,0,0,100,0,[]),
+                                      ('fc',0,0,0,0,0,10,0,[])], 
+                                      self.train_data, self.test_data)
         reward = 1 if terminated else 0  # Binary sparse rewards
         observation = self._get_obs()
         info = self._get_info()
