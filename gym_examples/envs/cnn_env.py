@@ -10,6 +10,20 @@ class StarWarsEnv(gym.Env):
 
         self.layer_depth_limit = 8
         self.layer_depth = 0
+
+
+        self.current_image_size = 28 #change this after each action
+
+        self.is_start_state = True #change this to False once we take the first action
+
+        self.allow_consecutive_pooling = False
+        self.allow_initial_pooling = False
+
+        self.max_fc_layers_allowed = 2
+        self.cur_num_fc_layers = 0 
+
+        self.current_state = [] #array of dictionaries
+
         self.observation_space = spaces.Dict(
             {
                 "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
@@ -42,6 +56,13 @@ class StarWarsEnv(gym.Env):
             3: "softmax"
         }
 
+        self._layer_type_to_discrete = {    # Maps discrete action space to layer type
+            "conv": 0,
+            "pool": 1,
+            "fc": 2,
+            "softmax": 3
+        }
+
         self._discrete_to_filter_depth = {    # Maps discrete action space to filter depth
             0: 0,
             1: 10,
@@ -64,6 +85,15 @@ class StarWarsEnv(gym.Env):
             3: 64
         }
 
+        self._state_elem_to_index = {
+            "layer_type": 0,
+            "layer_depth": 1,
+            "filter_depth": 2,
+            "filter_size": 3,
+            "fc_size": 4,
+            "terminal": 5
+        }
+
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -79,31 +109,106 @@ class StarWarsEnv(gym.Env):
         self.clock = None
     
     def get_valid_action_mask(self):
+
+        '''
+        Assuming current state looks like this-
+         spaces.Dict(
+            {
+                "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
+                "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
+                "filter_depth": spaces.Discrete(5), # Used for conv (64, 128, 256, 512) -- 0 is no filter
+                "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
+                "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+                "terminal": spaces.Discrete(2) # 0 if not terminal, 1 if terminal
+            }
+                 )
+        '''
         # # Disable actions that would move the agent off the grid
         # invalid_actions = []
 
         # create a mask representing valid actions in each dimension
-        md_mask = tuple([np.ones(x,) for x in self.action_space.nvec])
+        #start with all actions disabled
+        md_mask = tuple([np.zeros(x,) for x in self.action_space.nvec])
 
-        if self.layer_depth < self.layer_depth_limit-1:
-            pass
-        # # self.action_space.enable_actions()
-        # if self._agent_location[1] == self.size - 1:
-        #     invalid_actions.append(0)
-        # if self._agent_location[0] == 0:
-        #     invalid_actions.append(1)
-        # if self._agent_location[1] == 0:
-        #     invalid_actions.append(2)
-        # if self._agent_location[0] == self.size - 1:
-        #     invalid_actions.append(3)
+        if self.layer_depth < self.layer_depth_limit:
+            
+            #enable valid convolutions
+            if self.is_start_state or \
+                (self.is_start_state == False and self.current_state[-1]["layer_type"] in \
+                set(self._layer_type_to_discrete["conv"], self._layer_type_to_discrete["pool"])):
+
+                for d in self._discrete_to_filter_depth:
+                    for f in self._valid_filter_sizes_for_image():
+                        self._enable_convolution(self, md_mask, f, d)
+                         
+
+            #TODO: add global average pooling??
+
+
+            #enable valid pooling layers
+            if (self.is_start_state == False and \
+                (self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == "conv" or 
+                (self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == "pool" and self.allow_consecutive_pooling))) or \
+                (self.is_start_state and self.allow_initial_pooling): 
+
+                for f in self._valid_filter_sizes_for_image():
+                    self._enable_pooling(md_mask, f)
+                    
+
+
+            #enable valid fully connected layers
+            if (self.is_start_state == False and self._allow_fully_connected() and 
+            self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] in ['start', 'conv', 'pool']):
+                
+                for fc_sz in self._valid_fc_sizes_for_image():            
+                    self._enable_fc(md_mask, fc_sz)
+                    
+
+            
+            #fc to fc transitions
+            if self.is_start_state == False and self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == 'fc' \
+            and self.cur_num_fc_layers < self.max_fc_layers_allowed - 1:
+                
+                for fc_sz in self._valid_fc_sizes_for_image():
+                    self.cur_num_fc_layers += 1
+                    self._enable_fc(md_mask, fc_sz)    
+
         else:
-            md_mask[5][0] = 0
+
+            #enable only terminate action
+            md_mask[self._state_elem_to_index["terminal"]][1] = 1
 
         # mask = np.ones(self.action_space.n, dtype=np.int8)
         # mask[invalid_actions] = 0
 
         return md_mask
 
+    def _enable_convolution(self, md_mask, f, d):
+        md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["conv"]] = 1
+        md_mask[self._state_elem_to_index["layer_depth"]][d] = 1
+        md_mask[self._state_elem_to_index["filter_size"]][f] = 1
+
+    def _enable_pooling(self, md_mask, f):
+        md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["pool"]] = 1
+        md_mask[self._state_elem_to_index["filter_size"]][f] = 1  
+
+    def _enable_fc(self, md_mask, fc_sz):
+        md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["fc"]] = 1
+        md_mask[self._state_elem_to_index["fc_size"]][fc_sz] = 1      
+
+    
+    def _allow_fully_connected(self):
+        return self.current_image_size <= 4
+        
+    def _valid_filter_sizes_for_image(self):
+        return [c for c in self._discrete_to_filter_size if self._discrete_to_filter_size[c] < self.current_image_size]
+
+    def _valid_fc_sizes_for_image(self):
+        if self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == 'fc':
+            return [fc for fc in self._discrete_to_fc_size if self._discrete_to_filter_size[fc] < self.current_state[-1]["fc_size"]]
+        
+        return self._discrete_to_layer_type.keys()
+    
     def _get_obs(self):
         return {"r2d2": self._agent_location, "c3po": self._target_location, "vader": self._enemy_location}
     
@@ -117,7 +222,9 @@ class StarWarsEnv(gym.Env):
         # Seed self.np_random
         super().reset(seed=seed)
 
-        # Choose r2d2 location randomly at the beginning
+        self.is_start_state = True
+
+        """# Choose r2d2 location randomly at the beginning
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
         # sample c3po's location randomly until it does not coincide with the r2d2's location
@@ -139,7 +246,7 @@ class StarWarsEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, info
+        return observation, info"""
     
     def step(self, action):
         self.layer_depth+=1
