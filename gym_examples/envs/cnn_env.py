@@ -242,6 +242,9 @@ class StarWarsEnv(gym.Env):
     
     def step(self, action):
 
+        if self.is_start_state:
+            self.is_start_state = False
+
         terminated = False
 
         if action[self._state_elem_to_index["terminal"]] == 1:
@@ -274,7 +277,7 @@ class StarWarsEnv(gym.Env):
                                   []
                                   )
 
-            reward = generate_and_train(layersList)
+            reward = generate_and_train(layersList, self.train_data, self.test_data)
 
 
         self.layer_depth += 1    
