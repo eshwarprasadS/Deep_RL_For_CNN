@@ -2,6 +2,8 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
+import math
+from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
 
 class StarWarsEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -10,7 +12,6 @@ class StarWarsEnv(gym.Env):
 
         self.layer_depth_limit = 8
         self.layer_depth = 0
-
 
         self.current_image_size = 28 #change this after each action
 
@@ -208,13 +209,20 @@ class StarWarsEnv(gym.Env):
             return [fc for fc in self._discrete_to_fc_size if self._discrete_to_filter_size[fc] < self.current_state[-1]["fc_size"]]
         
         return self._discrete_to_layer_type.keys()
+
+    def _calculate_image_size(self, image_size, filter_size, stride):
+        new_size = int(math.ceil(float(image_size - filter_size + 1) / float(stride)))
+        return new_size    
     
     def _get_obs(self):
-        return {"r2d2": self._agent_location, "c3po": self._target_location, "vader": self._enemy_location}
+        return {"current_state": self.current_state}
     
     def _get_info(self):
-        return {"c3po_distance": np.linalg.norm(self._agent_location - self._target_location, ord=1),
-                "vader_distance": np.linalg.norm(self._agent_location - self._enemy_location, ord=1)}
+        return {
+                "current_image_size": self.current_image_size, 
+                "current_layer_depth": self.layer_depth,
+                "current_num_fc_layers": self.cur_num_fc_layers
+                }
 
 
 
@@ -224,49 +232,67 @@ class StarWarsEnv(gym.Env):
 
         self.is_start_state = True
 
-        """# Choose r2d2 location randomly at the beginning
-        self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
-
-        # sample c3po's location randomly until it does not coincide with the r2d2's location
-        self._target_location = self._agent_location
-        while np.array_equal(self._target_location, self._agent_location):
-            self._target_location = self.np_random.integers(
-                0, self.size, size=2, dtype=int
-            )
-        # sample vader's location randomly until it does not coincide with either of the previous locs
-        self._enemy_location = self._agent_location
-        while np.array_equal(self._enemy_location, self._agent_location) or np.array_equal(self._enemy_location, self._target_location):
-            self._enemy_location = self.np_random.integers(
-                0, self.size, size=2, dtype=int
-            )
-
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, info"""
+        return observation, info
     
     def step(self, action):
-        self.layer_depth+=1
-        direction = self._action_to_direction[action]
-        # clip to the grid for bounds
-        self._agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
+
         terminated = False
-        # An episode is done if r2d2 found c3po or effing DIED to vader
-        won = np.array_equal(self._agent_location, self._target_location)
-        died = np.array_equal(self._agent_location, self._enemy_location)
-        if won:
+
+        if action[self._state_elem_to_index["terminal"]] == 1:
             terminated = True
-            reward = 1 
-        elif died:
-            terminated = True
-            reward = -1
-        else:
-            reward = -0.005
+
+        if terminated:
+
+            # Pass an array of tuple containing- 
+            # layer_type, 
+            # layer_depth, 
+            # filter_depth, 
+            # filter_size, 
+            # stride, 
+            # image_size, 
+            # fc_size, 
+            # terminate, 
+            # state_list
+
+            layersList = []
+
+            for s in self.current_state:
+                layersList.append(s["layer_type"], 
+                                  s["layer_depth"], 
+                                  s["filter_depth"],
+                                  s["filter_size"],
+                                  1, #stride hardcoded to 1
+                                  s["image_size"],
+                                  s["fc_size"],
+                                  0,
+                                  []
+                                  )
+
+            reward = generate_and_train(layersList)
+
+
+        self.layer_depth += 1    
+
+        self.current_state.append({
+
+            "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc, softmax
+            "layer_depth": self.layer_depth, # Current depth of network (8 layers max)
+            "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
+            "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (1,3,5) -- 0 is no filter
+            "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
+            "image_size": self.current_image_size
+        })  
+
+        self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
+                                                             self.current_state[-1]["filter_size"], 1)  
+
+
         observation = self._get_obs()
         info = self._get_info()
 
