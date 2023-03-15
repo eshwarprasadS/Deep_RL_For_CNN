@@ -10,3 +10,9 @@ register(
     entry_point="gym_examples.envs:StarWarsEnv",
     max_episode_steps=300,
 )
+
+register(
+    id="gym_examples/CNN-v0",
+    entry_point="gym_examples.envs:CNNEnv",
+    max_episode_steps=300,
+)

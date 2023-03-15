@@ -5,15 +5,18 @@ import numpy as np
 import math
 from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
 
-class StarWarsEnv(gym.Env):
+
+
+
+class CNNEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, render_mode=None):
 
-        self.layer_depth_limit = 8
+        self.layer_depth_limit = 7
         self.layer_depth = 0
-
-        self.current_image_size = 28 #change this after each action
+        self.max_image_size_for_fc = 28
+        self.current_image_size = 28 # change this after each action
 
         self.is_start_state = True #change this to False once we take the first action
 
@@ -35,7 +38,6 @@ class StarWarsEnv(gym.Env):
                 # "image_size": spaces.Discrete(4) # Used for any layer that maintains square input (conv and pool) returned in info dict
             }
                  )
-
 
         #action space is a dictionary of the same size as the observation space
         # self.action_space = spaces.Dict(
@@ -72,20 +74,38 @@ class StarWarsEnv(gym.Env):
             4: 64
         }
 
+        self._filter_depth_to_discrete = {    # Maps discrete action space to filter depth
+            0: 0,
+            10: 1,
+            20: 2,
+            32: 3,
+            64: 4
+        }
+
         self._discrete_to_filter_size = {    # Maps discrete action space to filter size
             0: 0,
             1: 1,
             2: 3,
             3: 5
         }
-
+        self._filter_size_to_discrete = {    # Maps discrete action space to filter size   
+            0: 0,
+            1: 1,
+            3: 2,
+            5: 3
+        }
         self._discrete_to_fc_size = {    # Maps discrete action space to fc size
             0: 512,
             1: 256,
             2: 128,
             3: 64
         }
-
+        self._fc_size_to_discrete = {    # Maps discrete action space to fc size
+            512: 0,
+            256: 1,
+            128: 2,
+            64: 3
+        }
         self._state_elem_to_index = {
             "layer_type": 0,
             "layer_depth": 1,
@@ -95,6 +115,19 @@ class StarWarsEnv(gym.Env):
             "terminal": 5
         }
 
+        # initiate a conv layer with filter size 5 and 10 filters for all envs
+        # TODO: change this to a random conv layer, or random layer type or decide on how to initiate a dummy layer
+        self.current_image_size = self._calculate_image_size(self.current_image_size, 
+                                                                 5, 1)
+        self.current_state.append({
+
+            "layer_type": self._discrete_to_layer_type[0], # conv 
+            "layer_depth": self.layer_depth, # depth 0
+            "filter_depth": self._discrete_to_filter_depth[1], # 10 filters
+            "filter_size": self._discrete_to_filter_size[3], # filter size 5
+            "fc_size": self._discrete_to_fc_size[0], # any, doesn't matter for conv
+            "image_size": self.current_image_size
+        })
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -132,15 +165,16 @@ class StarWarsEnv(gym.Env):
         md_mask = tuple([np.zeros(x,) for x in self.action_space.nvec])
 
         if self.layer_depth < self.layer_depth_limit:
-            
+            print('inside layer depth limit')
             #enable valid convolutions
             if self.is_start_state or \
                 (self.is_start_state == False and self.current_state[-1]["layer_type"] in \
-                set(self._layer_type_to_discrete["conv"], self._layer_type_to_discrete["pool"])):
+                set(["conv", "pool"])):
 
+                print('inside conv or pool')
                 for d in self._discrete_to_filter_depth:
                     for f in self._valid_filter_sizes_for_image():
-                        self._enable_convolution(self, md_mask, f, d)
+                        self._enable_convolution(md_mask, f, d)
                          
 
             #TODO: add global average pooling??
@@ -148,8 +182,8 @@ class StarWarsEnv(gym.Env):
 
             #enable valid pooling layers
             if (self.is_start_state == False and \
-                (self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == "conv" or 
-                (self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == "pool" and self.allow_consecutive_pooling))) or \
+                (self.current_state[-1]["layer_type"] == "conv" or 
+                (self.current_state[-1]["layer_type"] == "pool" and self.allow_consecutive_pooling))) or \
                 (self.is_start_state and self.allow_initial_pooling): 
 
                 for f in self._valid_filter_sizes_for_image():
@@ -159,24 +193,35 @@ class StarWarsEnv(gym.Env):
 
             #enable valid fully connected layers
             if (self.is_start_state == False and self._allow_fully_connected() and 
-            self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] in ['start', 'conv', 'pool']):
+            self.current_state[-1]["layer_type"] in ['start', 'conv', 'pool']):
                 
                 for fc_sz in self._valid_fc_sizes_for_image():            
                     self._enable_fc(md_mask, fc_sz)
                     
-
+            #enable all FC layers if we are transitioning from conv or pool layers
+            if (self.is_start_state == False and self._allow_fully_connected() and
+            self.current_state[-1]["layer_type"] in ['conv', 'pool']):
+                
+                for fc_sz in self._discrete_to_fc_size:            
+                    self._enable_fc(md_mask, fc_sz)
             
             #fc to fc transitions
-            if self.is_start_state == False and self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == 'fc' \
+            if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc' \
             and self.cur_num_fc_layers < self.max_fc_layers_allowed - 1:
                 
                 for fc_sz in self._valid_fc_sizes_for_image():
                     self.cur_num_fc_layers += 1
                     self._enable_fc(md_mask, fc_sz)    
 
-        else:
+            # Enable terminal if its an FC layer
+            # TODO: Do we add terminal from other layers as well?
+            if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc':
+                md_mask[self._state_elem_to_index["terminal"]][1] = 1
 
-            #enable only terminate action
+            #enable only layer_depth+1 action if layer depth limit is not reached
+            md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
+        else:
+            #enable only terminate action if layer depth limit is reached
             md_mask[self._state_elem_to_index["terminal"]][1] = 1
 
         # mask = np.ones(self.action_space.n, dtype=np.int8)
@@ -185,8 +230,9 @@ class StarWarsEnv(gym.Env):
         return md_mask
 
     def _enable_convolution(self, md_mask, f, d):
+        # print('inside enable conv')
         md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["conv"]] = 1
-        md_mask[self._state_elem_to_index["layer_depth"]][d] = 1
+        md_mask[self._state_elem_to_index["filter_depth"]][d] = 1
         md_mask[self._state_elem_to_index["filter_size"]][f] = 1
 
     def _enable_pooling(self, md_mask, f):
@@ -199,14 +245,14 @@ class StarWarsEnv(gym.Env):
 
     
     def _allow_fully_connected(self):
-        return self.current_image_size <= 4
+        return self.current_image_size <= self.max_image_size_for_fc
         
     def _valid_filter_sizes_for_image(self):
         return [c for c in self._discrete_to_filter_size if self._discrete_to_filter_size[c] < self.current_image_size]
 
     def _valid_fc_sizes_for_image(self):
-        if self._discrete_to_layer_type[self.current_state[-1]["layer_type"]] == 'fc':
-            return [fc for fc in self._discrete_to_fc_size if self._discrete_to_filter_size[fc] < self.current_state[-1]["fc_size"]]
+        if self.current_state[-1]["layer_type"] == 'fc':
+            return [fc for fc in self._discrete_to_fc_size if self._discrete_to_fc_size[fc] < self.current_state[-1]["fc_size"]]
         
         return self._discrete_to_layer_type.keys()
 
@@ -215,10 +261,17 @@ class StarWarsEnv(gym.Env):
         return new_size    
     
     def _get_obs(self):
-        return {"current_state": self.current_state}
+        return {"layer_type": self._layer_type_to_discrete[self.current_state[-1]["layer_type"]],
+                "layer_depth": self.current_state[-1]["layer_depth"], 
+                "filter_depth": self._filter_depth_to_discrete[self.current_state[-1]["filter_depth"]],
+                "filter_size": self._filter_size_to_discrete[self.current_state[-1]["filter_size"]], 
+                "fc_size": self._fc_size_to_discrete[self.current_state[-1]["fc_size"]]
+                }
+        # return {"current_state": self.current_state}
     
     def _get_info(self):
         return {
+                "current_network" : self.current_state,
                 "current_image_size": self.current_image_size, 
                 "current_layer_depth": self.layer_depth,
                 "current_num_fc_layers": self.cur_num_fc_layers
@@ -279,6 +332,8 @@ class StarWarsEnv(gym.Env):
 
             reward = generate_and_train(layersList, self.train_data, self.test_data)
 
+        else:
+            reward = 0
 
         self.layer_depth += 1    
 
@@ -292,8 +347,12 @@ class StarWarsEnv(gym.Env):
             "image_size": self.current_image_size
         })  
 
-        self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
-                                                             self.current_state[-1]["filter_size"], 1)  
+        if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
+            self.current_image_size = self._calculate_image_size(self.current_image_size, 
+                                                                 self.current_state[-1]["filter_size"], 1)
+
+        # self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
+        #                                                      self.current_state[-1]["filter_size"], 1)  
 
 
         observation = self._get_obs()
