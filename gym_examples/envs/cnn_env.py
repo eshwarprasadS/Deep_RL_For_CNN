@@ -4,21 +4,37 @@ import pygame
 import numpy as np
 import math
 from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
+from torchvision import datasets
+from torchvision.transforms import ToTensor
 
-
-
+# TODO: Implement approach B for start state
+# TODO: Terminal transition from every state
+# TODO: Diff strides for pooling
+# TODO: Diff pool sizes
 
 class CNNEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, render_mode=None):
 
+        self.train_data = datasets.MNIST(
+                            root = 'data',
+                            train = True,                         
+                            transform = ToTensor(), 
+                            download = True,            
+                            )
+        self.test_data = datasets.MNIST(
+                            root = 'data', 
+                            train = False, 
+                            transform = ToTensor()
+                            )
+
         self.layer_depth_limit = 7
         self.layer_depth = 0
         self.max_image_size_for_fc = 28
         self.current_image_size = 28 # change this after each action
 
-        self.is_start_state = True #change this to False once we take the first action
+        self.is_start_state = 1 #change this to 0 once we take the first action
 
         self.allow_consecutive_pooling = False
         self.allow_initial_pooling = False
@@ -34,7 +50,8 @@ class CNNEnv(gym.Env):
                 "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
                 "filter_depth": spaces.Discrete(5), # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
                 "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
-                "fc_size": spaces.Discrete(4) # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+                "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+                "is_start": spaces.Discrete(2) # 0 if not start state, 1 if start state
                 # "image_size": spaces.Discrete(4) # Used for any layer that maintains square input (conv and pool) returned in info dict
             }
                  )
@@ -120,13 +137,14 @@ class CNNEnv(gym.Env):
         self.current_image_size = self._calculate_image_size(self.current_image_size, 
                                                                  5, 1)
         self.current_state.append({
-
+            
             "layer_type": self._discrete_to_layer_type[0], # conv 
             "layer_depth": self.layer_depth, # depth 0
             "filter_depth": self._discrete_to_filter_depth[1], # 10 filters
             "filter_size": self._discrete_to_filter_size[3], # filter size 5
             "fc_size": self._discrete_to_fc_size[0], # any, doesn't matter for conv
-            "image_size": self.current_image_size
+            "image_size": self.current_image_size,
+            "is_start": self.is_start_state
         })
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -214,7 +232,7 @@ class CNNEnv(gym.Env):
                     self._enable_fc(md_mask, fc_sz)    
 
             # Enable terminal if its an FC layer
-            # TODO: Do we add terminal from other layers as well?
+            # TODO: Do we add terminal from other layers as well? -> Yes
             if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc':
                 md_mask[self._state_elem_to_index["terminal"]][1] = 1
 
@@ -283,7 +301,7 @@ class CNNEnv(gym.Env):
         # Seed self.np_random
         super().reset(seed=seed)
 
-        self.is_start_state = True
+        self.is_start_state = 1
 
         observation = self._get_obs()
         info = self._get_info()
@@ -296,7 +314,7 @@ class CNNEnv(gym.Env):
     def step(self, action):
 
         if self.is_start_state:
-            self.is_start_state = False
+            self.is_start_state = 0
 
         terminated = False
 
@@ -344,7 +362,8 @@ class CNNEnv(gym.Env):
             "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
             "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (1,3,5) -- 0 is no filter
             "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
-            "image_size": self.current_image_size
+            "image_size": self.current_image_size,
+            "is_start": self.is_start_state
         })  
 
         if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
