@@ -51,7 +51,8 @@ class CNNEnv(gym.Env):
                 "filter_depth": spaces.Discrete(5), # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
                 "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
                 "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
-                "is_start": spaces.Discrete(2) # 0 if not start state, 1 if start state
+                "is_start": spaces.Discrete(2), # 0 if not start state, 1 if start state
+                "pool_size_and_stride": spaces.Discrete(4) # (5,3), (3,2), (2,2) -- 0 is no filter
                 # "image_size": spaces.Discrete(4) # Used for any layer that maintains square input (conv and pool) returned in info dict
             }
                  )
@@ -64,10 +65,11 @@ class CNNEnv(gym.Env):
         #         "filter_depth": spaces.Discrete(5), # Used for conv (64, 128, 256, 512) -- 0 is no filter
         #         "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
         #         "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
-        #         "terminal": spaces.Discrete(2) # 0 if not terminal, 1 if terminal
+        #         "terminal": spaces.Discrete(2), # 0 if not terminal, 1 if terminal
+        #         "pool_size_and_stride": spaces.Discrete(4)
         #     }
         #          )
-        self.action_space = spaces.MultiDiscrete([4, 8, 5, 4, 4, 2]) # 4, 8, 5, 4, 4, 2 corresponds to the number of discrete actions in each space
+        self.action_space = spaces.MultiDiscrete([4, 8, 5, 4, 4, 2, 4]) # 4, 8, 5, 4, 4, 2 corresponds to the number of discrete actions in each space
 
         self._discrete_to_layer_type = {    # Maps discrete action space to layer type
             0: "conv",
@@ -105,6 +107,21 @@ class CNNEnv(gym.Env):
             2: 3,
             3: 5
         }
+
+        self._discrete_to_pool_size = {
+            0: (0, 0),
+            1: (5, 3),
+            2: (3, 2),
+            3: (2, 2) 
+        }
+
+        self._pool_size_to_discrete = {    
+            0: 0,
+            5: 1,
+            3: 2,
+            2: 3
+        }
+
         self._filter_size_to_discrete = {    # Maps discrete action space to filter size   
             0: 0,
             1: 1,
@@ -129,13 +146,16 @@ class CNNEnv(gym.Env):
             "filter_depth": 2,
             "filter_size": 3,
             "fc_size": 4,
-            "terminal": 5
+            "terminal": 5,
+            "pool_size_and_stride": 6,
         }
 
         # initiate a conv layer with filter size 5 and 10 filters for all envs
         # TODO: change this to a random conv layer, or random layer type or decide on how to initiate a dummy layer
-        self.current_image_size = self._calculate_image_size(self.current_image_size, 
-                                                                 5, 1)
+        # self.current_image_size = self._calculate_image_size(self.current_image_size, 
+        #                                                          self.current_state[-1])
+        self.current_image_size = 28
+
         self.current_state.append({
             
             "layer_type": self._discrete_to_layer_type[0], # conv 
@@ -144,6 +164,8 @@ class CNNEnv(gym.Env):
             "filter_size": self._discrete_to_filter_size[3], # filter size 5
             "fc_size": self._discrete_to_fc_size[0], # any, doesn't matter for conv
             "image_size": self.current_image_size,
+            "pool_size": self._discrete_to_pool_size[3][0], 
+            "pool_stride": self._discrete_to_pool_size[3][1],
             "is_start": self.is_start_state
         })
 
@@ -204,7 +226,8 @@ class CNNEnv(gym.Env):
                 (self.current_state[-1]["layer_type"] == "pool" and self.allow_consecutive_pooling))) or \
                 (self.is_start_state and self.allow_initial_pooling): 
 
-                for f in self._valid_filter_sizes_for_image():
+                print('inside valid pool')
+                for f in self._valid_pooling_sizes_for_image():
                     self._enable_pooling(md_mask, f)
                     
 
@@ -255,7 +278,7 @@ class CNNEnv(gym.Env):
 
     def _enable_pooling(self, md_mask, f):
         md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["pool"]] = 1
-        md_mask[self._state_elem_to_index["filter_size"]][f] = 1  
+        md_mask[self._state_elem_to_index["pool_size_and_stride"]][f] = 1  
 
     def _enable_fc(self, md_mask, fc_sz):
         md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["fc"]] = 1
@@ -264,6 +287,9 @@ class CNNEnv(gym.Env):
     
     def _allow_fully_connected(self):
         return self.current_image_size <= self.max_image_size_for_fc
+
+    def _valid_pooling_sizes_for_image(self):
+        return [p for p in self._discrete_to_pool_size if self._discrete_to_pool_size[p][0] < self.current_image_size]    
         
     def _valid_filter_sizes_for_image(self):
         return [c for c in self._discrete_to_filter_size if self._discrete_to_filter_size[c] < self.current_image_size]
@@ -274,16 +300,36 @@ class CNNEnv(gym.Env):
         
         return self._discrete_to_layer_type.keys()
 
-    def _calculate_image_size(self, image_size, filter_size, stride):
-        new_size = int(math.ceil(float(image_size - filter_size + 1) / float(stride)))
+    def _calculate_image_size(self, image_size, prev_layer):
+
+        new_size = None
+
+        if prev_layer["layer_type"] == "conv":
+            new_size = int(math.ceil(float(image_size - prev_layer["filter_size"] + 1) / float(1)))
+        else:
+            new_size = int(math.ceil(float(image_size - prev_layer["pool_size"] + 1) / float(prev_layer["pool_stride"])))   
+        
         return new_size    
     
     def _get_obs(self):
+
+        """ Should be same format as- 
+            "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
+            "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
+            "filter_depth": spaces.Discrete(5), # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
+            "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
+            "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+            "is_start": spaces.Discrete(2), # 0 if not start state, 1 if start state
+            "pool_size_and_stride": spaces.Discrete(4) # (5,3), (3,2), (2,2) -- 0 is no filter
+        """
+        
         return {"layer_type": self._layer_type_to_discrete[self.current_state[-1]["layer_type"]],
                 "layer_depth": self.current_state[-1]["layer_depth"], 
                 "filter_depth": self._filter_depth_to_discrete[self.current_state[-1]["filter_depth"]],
                 "filter_size": self._filter_size_to_discrete[self.current_state[-1]["filter_size"]], 
-                "fc_size": self._fc_size_to_discrete[self.current_state[-1]["fc_size"]]
+                "fc_size": self._fc_size_to_discrete[self.current_state[-1]["fc_size"]],
+                "is_start": self.is_start_state,
+                "pool_size_and_stride": self._pool_size_to_discrete[self.current_state[-1]["pool_size"]], #since size and stride is a pair we can return same discrete for both
                 }
         # return {"current_state": self.current_state}
     
@@ -337,17 +383,28 @@ class CNNEnv(gym.Env):
             layersList = []
 
             for s in self.current_state:
-                layersList.append(s["layer_type"], 
-                                  s["layer_depth"], 
-                                  s["filter_depth"],
-                                  s["filter_size"],
-                                  1, #stride hardcoded to 1
-                                  s["image_size"],
-                                  s["fc_size"],
-                                  0,
-                                  []
-                                  )
-
+                if s["layer_type"] == "conv":
+                    layersList.append(s["layer_type"], 
+                                    s["layer_depth"], 
+                                    s["filter_depth"],
+                                    s["filter_size"],
+                                    1, #stride hardcoded to 1
+                                    s["image_size"],
+                                    s["fc_size"],
+                                    0,
+                                    []
+                                    )
+                else:    
+                    layersList.append(s["layer_type"], 
+                                    s["layer_depth"], 
+                                    s["filter_depth"],
+                                    s["pool_size"],
+                                    s["pool_stride"],
+                                    s["image_size"],
+                                    s["fc_size"],
+                                    0,
+                                    []
+                                    )
             reward = generate_and_train(layersList, self.train_data, self.test_data)
 
         else:
@@ -363,12 +420,14 @@ class CNNEnv(gym.Env):
             "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (1,3,5) -- 0 is no filter
             "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
             "image_size": self.current_image_size,
-            "is_start": self.is_start_state
+            "is_start": self.is_start_state,
+            "pool_size": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][0],
+            "pool_stride": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][1],
         })  
 
         if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
             self.current_image_size = self._calculate_image_size(self.current_image_size, 
-                                                                 self.current_state[-1]["filter_size"], 1)
+                                                                 self.current_state[-1])
 
         # self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
         #                                                      self.current_state[-1]["filter_size"], 1)  
