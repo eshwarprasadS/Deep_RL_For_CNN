@@ -36,6 +36,7 @@ class CNNEnv(gym.Env):
 
         self.is_start_state = 1 #change this to 0 once we take the first action
 
+        self.fc_terminate = False
         self.allow_consecutive_pooling = False
         self.allow_initial_pooling = False
 
@@ -46,13 +47,13 @@ class CNNEnv(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                "layer_type": spaces.Discrete(4), # conv, pool, fc, softmax
-                "layer_depth": spaces.Discrete(8), # Current depth of network (8 layers max)
-                "filter_depth": spaces.Discrete(5), # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
-                "filter_size": spaces.Discrete(4), # Used for conv and pool (1,3,5) -- 0 is no filter
-                "fc_size": spaces.Discrete(4), # Used for fc and softmax -- number of neurons in layer (512, 256, 128, 64)
+                "layer_type": spaces.Discrete(3), # conv, pool, fc
+                "layer_depth": spaces.Discrete(9), # Current depth of network (START layer + 8 layers max)
+                "filter_depth": spaces.Discrete(5), # Used for conv (0, 10, 20, 32, 64)
+                "filter_size": spaces.Discrete(4), # Used for conv and pool (0, 1, 3, 5)
+                "fc_size": spaces.Discrete(5), # Used for fc -- number of neurons in layer (0, 512, 256, 128, 64)
                 "is_start": spaces.Discrete(2), # 0 if not start state, 1 if start state
-                "pool_size_and_stride": spaces.Discrete(4) # (5,3), (3,2), (2,2) -- 0 is no filter
+                "pool_size_and_stride": spaces.Discrete(4) # (0,0), (5,3), (3,2), (2,2)
                 # "image_size": spaces.Discrete(4) # Used for any layer that maintains square input (conv and pool) returned in info dict
             }
                  )
@@ -69,20 +70,18 @@ class CNNEnv(gym.Env):
         #         "pool_size_and_stride": spaces.Discrete(4)
         #     }
         #          )
-        self.action_space = spaces.MultiDiscrete([4, 8, 5, 4, 4, 2, 4]) # 4, 8, 5, 4, 4, 2 corresponds to the number of discrete actions in each space
+        self.action_space = spaces.MultiDiscrete([3, 9, 5, 4, 5, 2, 4]) # 3, 9, 5, 4, 5, 2, 4 corresponds to the number of discrete actions in each space
 
         self._discrete_to_layer_type = {    # Maps discrete action space to layer type
             0: "conv",
             1: "pool",
-            2: "fc",
-            3: "softmax"
+            2: "fc"
         }
 
         self._layer_type_to_discrete = {    # Maps discrete action space to layer type
             "conv": 0,
             "pool": 1,
-            "fc": 2,
-            "softmax": 3
+            "fc": 2
         }
 
         self._discrete_to_filter_depth = {    # Maps discrete action space to filter depth
@@ -108,6 +107,13 @@ class CNNEnv(gym.Env):
             3: 5
         }
 
+        self._filter_size_to_discrete = {    # Maps discrete action space to filter size   
+            0: 0,
+            1: 1,
+            3: 2,
+            5: 3
+        }
+
         self._discrete_to_pool_size = {
             0: (0, 0),
             1: (5, 3),
@@ -115,30 +121,26 @@ class CNNEnv(gym.Env):
             3: (2, 2) 
         }
 
-        self._pool_size_to_discrete = {    
+        self._pool_size_to_discrete = {   # Maps discrete action space to filter size
             0: 0,
             5: 1,
             3: 2,
             2: 3
         }
 
-        self._filter_size_to_discrete = {    # Maps discrete action space to filter size   
-            0: 0,
-            1: 1,
-            3: 2,
-            5: 3
-        }
         self._discrete_to_fc_size = {    # Maps discrete action space to fc size
-            0: 512,
-            1: 256,
-            2: 128,
-            3: 64
+            0: 0,
+            1: 512,
+            2: 256,
+            3: 128,
+            4: 64
         }
         self._fc_size_to_discrete = {    # Maps discrete action space to fc size
-            512: 0,
-            256: 1,
-            128: 2,
-            64: 3
+            0: 0,
+            512: 1,
+            256: 2,
+            128: 3,
+            64: 4
         }
         self._state_elem_to_index = {
             "layer_type": 0,
@@ -158,15 +160,15 @@ class CNNEnv(gym.Env):
 
         self.current_state.append({
             
-            "layer_type": self._discrete_to_layer_type[0], # conv 
-            "layer_depth": self.layer_depth, # depth 0
-            "filter_depth": self._discrete_to_filter_depth[1], # 10 filters
-            "filter_size": self._discrete_to_filter_size[3], # filter size 5
+            "layer_type": self._discrete_to_layer_type[0], # any, doesn't matter for conv 
+            "layer_depth": self.layer_depth, # any, doesn't matter for conv
+            "filter_depth": self._discrete_to_filter_depth[0], # any, doesn't matter for conv
+            "filter_size": self._discrete_to_filter_size[0], # any, doesn't matter for conv
             "fc_size": self._discrete_to_fc_size[0], # any, doesn't matter for conv
-            "image_size": self.current_image_size,
-            "pool_size": self._discrete_to_pool_size[3][0], 
-            "pool_stride": self._discrete_to_pool_size[3][1],
-            "is_start": self.is_start_state
+            "image_size": self.current_image_size, # 28
+            "pool_size": self._discrete_to_pool_size[0][0], # any, doesn't matter for conv
+            "pool_stride": self._discrete_to_pool_size[0][1], # any, doesn't matter for conv
+            "is_start": self.is_start_state # Yes, this is the start state
         })
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -204,66 +206,90 @@ class CNNEnv(gym.Env):
         #start with all actions disabled
         md_mask = tuple([np.zeros(x,) for x in self.action_space.nvec])
 
-        if self.layer_depth < self.layer_depth_limit:
-            print('inside layer depth limit')
-            #enable valid convolutions
-            if self.is_start_state or \
-                (self.is_start_state == False and self.current_state[-1]["layer_type"] in \
-                set(["conv", "pool"])):
+        print('inside layer depth limit')
+        # enable valid convolutions
+        if self.is_start_state or \
+            (self.is_start_state == False and self.current_state[-1]["layer_type"] in \
+            set(["conv", "pool"])):
 
-                print('inside conv or pool')
-                for d in self._discrete_to_filter_depth:
-                    for f in self._valid_filter_sizes_for_image():
-                        self._enable_convolution(md_mask, f, d)
-                         
+            print('enabling convolutions')
+            for d in list(self._discrete_to_filter_depth.keys())[1:]:
+                for f in self._valid_filter_sizes_for_image():
+                    self._enable_convolution(md_mask, f, d)
 
-            #TODO: add global average pooling??
-
-
-            #enable valid pooling layers
-            if (self.is_start_state == False and \
-                (self.current_state[-1]["layer_type"] == "conv" or 
-                (self.current_state[-1]["layer_type"] == "pool" and self.allow_consecutive_pooling))) or \
-                (self.is_start_state and self.allow_initial_pooling): 
-
-                print('inside valid pool')
-                for f in self._valid_pooling_sizes_for_image():
-                    self._enable_pooling(md_mask, f)
-                    
+        else:
+            # enable only 0 filter depth and 0 filter size as convolutions are not allowed
+            md_mask[self._state_elem_to_index["filter_depth"]][0] = 1
+            md_mask[self._state_elem_to_index["filter_size"]][0] = 1
 
 
-            #enable valid fully connected layers
-            if (self.is_start_state == False and self._allow_fully_connected() and 
-            self.current_state[-1]["layer_type"] in ['start', 'conv', 'pool']):
-                
-                for fc_sz in self._valid_fc_sizes_for_image():            
-                    self._enable_fc(md_mask, fc_sz)
-                    
-            #enable all FC layers if we are transitioning from conv or pool layers
-            if (self.is_start_state == False and self._allow_fully_connected() and
-            self.current_state[-1]["layer_type"] in ['conv', 'pool']):
-                
-                for fc_sz in self._discrete_to_fc_size:            
-                    self._enable_fc(md_mask, fc_sz)
+        #TODO: add global average pooling??
+
+
+        # enable valid pooling layers
+        if (self.is_start_state == False and \
+            (self.current_state[-1]["layer_type"] == "conv" or 
+            (self.current_state[-1]["layer_type"] == "pool" and self.allow_consecutive_pooling))) or \
+            (self.is_start_state and self.allow_initial_pooling): 
+
+            print('enabling valid pools')
+            for f in self._valid_pooling_sizes_for_image():
+                self._enable_pooling(md_mask, f)
+        else:
+            # enable only 0 pool size and stride as pooling is not allowed
+            md_mask[self._state_elem_to_index["pool_size_and_stride"]][0] = 1
             
-            #fc to fc transitions
-            if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc' \
-            and self.cur_num_fc_layers < self.max_fc_layers_allowed - 1:
+        # # enable valid fully connected layers
+        # if (self.is_start_state == False and self._allow_fully_connected() and 
+        # self.current_state[-1]["layer_type"] in ['start', 'conv', 'pool']):
+            
+        #     for fc_sz in self._valid_fc_sizes_for_image():            
+        #         self._enable_fc(md_mask, fc_sz)
                 
-                for fc_sz in self._valid_fc_sizes_for_image():
-                    self.cur_num_fc_layers += 1
-                    self._enable_fc(md_mask, fc_sz)    
+        # enable all FC layers if we are transitioning from conv or pool layers
+        if (self.is_start_state == False and self._allow_fully_connected() and
+        self.current_state[-1]["layer_type"] in ['conv', 'pool']):
+            
+            for fc_sz in list(self._discrete_to_fc_size.keys())[1:]:            
+                self._enable_fc(md_mask, fc_sz)
+        
+        #fc to fc transitions, only allow smaller fc layers than the previous one and only 2 fc layers
+        elif self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc' \
+        and self.cur_num_fc_layers < self.max_fc_layers_allowed:
+            
+            for fc_sz in self._valid_fc_sizes_for_image():
+                # self.cur_num_fc_layers += 1
+                self._enable_fc(md_mask, fc_sz)    
 
-            # Enable terminal if its an FC layer
-            # TODO: Do we add terminal from other layers as well? -> Yes
-            if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc':
+            md_mask[self._state_elem_to_index["terminal"]][1] = 1
+            self.fc_terminate = True
+
+    
+        else:
+            # enable only 0 fc size as fc layers are not allowed
+            md_mask[self._state_elem_to_index["fc_size"]][0] = 1
+
+        # Enable terminal if its an FC layer
+        # TODO: Do we add terminal from other layers as well? -> Yes | Done
+        # if self.is_start_state == False and self.current_state[-1]["layer_type"] == 'fc':
+        #     md_mask[self._state_elem_to_index["terminal"]][1] = 1
+
+        if self.fc_terminate == False:
+            # Enable terminal and non terminal from every layer type, if not start state and layer depth limit is not reached
+            if self.layer_depth < self.layer_depth_limit-1 and self.is_start_state == False:
+                md_mask[self._state_elem_to_index["terminal"]][0] = 1
                 md_mask[self._state_elem_to_index["terminal"]][1] = 1
 
-            #enable only layer_depth+1 action if layer depth limit is not reached
-            md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
-        else:
-            #enable only terminate action if layer depth limit is reached
-            md_mask[self._state_elem_to_index["terminal"]][1] = 1
+            # Enable only terminal if layer depth limit is reached
+            elif self.is_start_state == False:
+                md_mask[self._state_elem_to_index["terminal"]][1] = 1
+        
+            elif self.is_start_state == True: #allow only non terminal action from start state
+                md_mask[self._state_elem_to_index["terminal"]][0] = 1
+
+        # enable only layer_depth+1 action if layer depth limit is not reached
+        md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
+
 
         # mask = np.ones(self.action_space.n, dtype=np.int8)
         # mask[invalid_actions] = 0
@@ -289,16 +315,16 @@ class CNNEnv(gym.Env):
         return self.current_image_size <= self.max_image_size_for_fc
 
     def _valid_pooling_sizes_for_image(self):
-        return [p for p in self._discrete_to_pool_size if self._discrete_to_pool_size[p][0] < self.current_image_size]    
+        return [p for p in list(self._discrete_to_pool_size.keys())[1:] if self._discrete_to_pool_size[p][0] < self.current_image_size]    
         
     def _valid_filter_sizes_for_image(self):
-        return [c for c in self._discrete_to_filter_size if self._discrete_to_filter_size[c] < self.current_image_size]
+        return [c for c in list(self._discrete_to_filter_size.keys())[1:] if self._discrete_to_filter_size[c] < self.current_image_size]
 
     def _valid_fc_sizes_for_image(self):
         if self.current_state[-1]["layer_type"] == 'fc':
-            return [fc for fc in self._discrete_to_fc_size if self._discrete_to_fc_size[fc] < self.current_state[-1]["fc_size"]]
+            return [fc for fc in list(self._discrete_to_fc_size.keys())[1:] if self._discrete_to_fc_size[fc] < self.current_state[-1]["fc_size"]]
         
-        return self._discrete_to_layer_type.keys()
+        return list(self._discrete_to_layer_type.keys())[1:]
 
     def _calculate_image_size(self, image_size, prev_layer):
 
@@ -382,20 +408,20 @@ class CNNEnv(gym.Env):
 
             layersList = []
 
-            for s in self.current_state:
+            for s in self.current_state[1:]: #ignoring start state
                 if s["layer_type"] == "conv":
-                    layersList.append(s["layer_type"], 
+                    layersList.append((s["layer_type"], 
                                     s["layer_depth"], 
                                     s["filter_depth"],
                                     s["filter_size"],
-                                    1, #stride hardcoded to 1
+                                    1, # stride hardcoded to 1 for conv
                                     s["image_size"],
                                     s["fc_size"],
                                     0,
                                     []
-                                    )
+                                    ))
                 else:    
-                    layersList.append(s["layer_type"], 
+                    layersList.append((s["layer_type"], 
                                     s["layer_depth"], 
                                     s["filter_depth"],
                                     s["pool_size"],
@@ -404,7 +430,7 @@ class CNNEnv(gym.Env):
                                     s["fc_size"],
                                     0,
                                     []
-                                    )
+                                    ))
             reward = generate_and_train(layersList, self.train_data, self.test_data)
 
         else:
@@ -414,10 +440,10 @@ class CNNEnv(gym.Env):
 
         self.current_state.append({
 
-            "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc, softmax
+            "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
             "layer_depth": self.layer_depth, # Current depth of network (8 layers max)
             "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
-            "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (1,3,5) -- 0 is no filter
+            "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (0, 1,3,5) -- 0 is no filter
             "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
             "image_size": self.current_image_size,
             "is_start": self.is_start_state,
@@ -426,12 +452,14 @@ class CNNEnv(gym.Env):
         })  
 
         if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
+            print('current_state layer type =', self.current_state[-1]["layer_type"])
             self.current_image_size = self._calculate_image_size(self.current_image_size, 
                                                                  self.current_state[-1])
 
         # self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
         #                                                      self.current_state[-1]["filter_size"], 1)  
-
+        if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "fc":
+            self.cur_num_fc_layers += 1
 
         observation = self._get_obs()
         info = self._get_info()
