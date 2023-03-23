@@ -28,7 +28,15 @@ class CNNEnv(gym.Env):
                             train = False, 
                             transform = ToTensor()
                             )
+        train_idx = (self.train_data.targets==0) | (self.train_data.targets==1) | (self.train_data.targets==2)
+        test_idx = (self.test_data.targets==0) | (self.test_data.targets==1) | (self.test_data.targets==2)
 
+        self.train_data.data = self.train_data.data[train_idx]
+        self.train_data.targets = self.train_data.targets[train_idx]
+        self.test_data.data = self.test_data.data[test_idx]
+        self.test_data.targets = self.test_data.targets[test_idx]
+
+        
         self.layer_depth_limit = 7
         self.layer_depth = 0
         self.max_image_size_for_fc = 28

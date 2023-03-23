@@ -2,7 +2,7 @@ import gym
 from gym import spaces
 import pygame
 import numpy as np
-from gym.spaces.dynamic import Dynamic
+# from gym.spaces.dynamic import Dynamic
 from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
 from torchvision import datasets
 from torchvision.transforms import ToTensor

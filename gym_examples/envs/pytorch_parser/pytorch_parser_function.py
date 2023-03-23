@@ -23,27 +23,13 @@ from torchvision.transforms import ToTensor
 
 torch.manual_seed(1)
 
-# device=torch.device(0)
-# print(device)
-
-# device='cuda'
-device = 'cpu'
-#take a tuple
-# layer_type=None,        # String -- conv, pool, fc, softmax
-# layer_depth=None,       # Current depth of network
-# filter_depth=None,      # Used for conv, 0 when not conv
-# filter_size=None,       # Used for conv and pool, 0 otherwise
-# stride=None,            # Used for conv and pool, 0 otherwise
-# image_size=None,        # Used for any layer that maintains square input (conv and pool), 0 otherwise
-# fc_size=None,           # Used for fc and softmax -- number of neurons in layer
-# terminate=None,
-# state_list=None):
+device=torch.device(0) if torch.cuda.is_available() else 'cpu'
 
 # TODO: Account for PADDING
-# TODO: Make work for list params for image size, filter size etc (i.e. non square inputs)
+# NOTE: Make work for list params for image size, filter size etc (i.e. non square inputs) -> assuming all square currently
 
 class GenerateCNN(nn.Module):
-    def __init__(self, network_tuples, n_init_channels):
+    def __init__(self, network_tuples, n_init_channels, n_classes=3):
       '''
       network_tuples: list of tuples defining network. Params:
         layer_type,        # String -- conv, pool, fc, softmax
@@ -89,27 +75,37 @@ class GenerateCNN(nn.Module):
 
         elif layer_type=='fc':
 
-          # TODO: handle multiple fcs
-
-          assert image_size == 0, "Image size to fc layer must be 0, is {}".format(image_size)
+          # assert image_size == 0, "Image size to fc layer must be 0, is {}".format(image_size)
           if firstFC:
             firstFC=False
-            # print('FC running img size:{}, in_filter:{}'.format(running_image_size, in_filter))
-            image_size_unroll=running_image_size**2 # ######################################## TODO: change!
+            image_size_unroll=running_image_size**2 # NOTE: assumption of only square images
             image_size_unroll*=in_filter
             # print('Unrolled img size:',image_size_unroll)
-
+            # self.layers.append(nn.Flatten())
             self.layers.append(nn.Linear(image_size_unroll,fc_size))
             
           else:
             self.layers.append(nn.Linear(running_fc_size,fc_size))
           running_fc_size=fc_size
+      
+      # get the last layer and check
+      # if lastlayer == FC AND has 3 out: Do nothing
+      # if lastlayer == FC But not 3 out: Add FC with 3 Out
+      lastlayer=self.layers[-1]
+      if (isinstance(lastlayer, nn.Linear) and lastlayer.out_features!=n_classes):
+          print(lastlayer.out_features)
+          self.layers.append(nn.Linear(lastlayer.out_features, n_classes))
           
-        
-        
+      # if lastlayer != FC -> Flatten -> Add FC with 3 Out
+      elif isinstance(lastlayer, nn.Conv2d) or isinstance(lastlayer, nn.MaxPool2d):
+          self.layers.append(nn.Flatten())
+          image_size_unroll=running_image_size**2 # NOTE: assumption of only square images
+          image_size_unroll*=in_filter
 
-
-      # https://github.com/bowenbaker/metaqnn/blob/a25847f635e9545455f83405453e740646038f7a/libs/grammar/state_enumerator.py#L207
+          self.layers.append(nn.Linear(image_size_unroll,n_classes))         
+        
+    
+    # https://github.com/bowenbaker/metaqnn/blob/a25847f635e9545455f83405453e740646038f7a/libs/grammar/state_enumerator.py#L207
     def _calc_new_image_size(self, image_size, filter_size, stride):
       '''Returns new image size given previous image size and filter parameters'''
       new_size = int(math.ceil(float(image_size - filter_size + 1) / float(stride)))
@@ -122,7 +118,6 @@ class GenerateCNN(nn.Module):
         elif isinstance(layer, nn.MaxPool2d):
           layer_type='mp'
         elif isinstance(layer, nn.Linear):
-          layer_type
           x=x.view(x.shape[0],-1) #flatten before a linear layer
         x=layer(x)
         # print(layer_type, x.shape)
