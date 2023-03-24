@@ -69,6 +69,11 @@ class GenerateCNN(nn.Module):
 
 
         elif layer_type=='pool':
+          if i==0:
+            # self.layers.append(nn.MaxPool2d(filter_size, stride))
+            running_image_size=image_size
+            in_filter=n_init_channels
+
           self.layers.append(nn.MaxPool2d(filter_size, stride))
           running_image_size=self._calc_new_image_size(running_image_size, filter_size, stride)
 
@@ -91,21 +96,25 @@ class GenerateCNN(nn.Module):
       # get the last layer and check
       # if lastlayer == FC AND has 3 out: Do nothing
       # if lastlayer == FC But not 3 out: Add FC with 3 Out
+      # if lastlayer != FC -> Flatten -> Add FC with 3 Out
       lastlayer=self.layers[-1]
       if (isinstance(lastlayer, nn.Linear) and lastlayer.out_features!=n_classes):
           print(lastlayer.out_features)
+          # self.layers.append(nn.Flatten())
           self.layers.append(nn.Linear(lastlayer.out_features, n_classes))
           
-      # if lastlayer != FC -> Flatten -> Add FC with 3 Out
       elif isinstance(lastlayer, nn.Conv2d) or isinstance(lastlayer, nn.MaxPool2d):
           self.layers.append(nn.Flatten())
           image_size_unroll=running_image_size**2 # NOTE: assumption of only square images
           image_size_unroll*=in_filter
+          # print('Unrolled img size:',image_size_unroll)
 
           self.layers.append(nn.Linear(image_size_unroll,n_classes))         
         
-    
-    # https://github.com/bowenbaker/metaqnn/blob/a25847f635e9545455f83405453e740646038f7a/libs/grammar/state_enumerator.py#L207
+        
+
+
+      # https://github.com/bowenbaker/metaqnn/blob/a25847f635e9545455f83405453e740646038f7a/libs/grammar/state_enumerator.py#L207
     def _calc_new_image_size(self, image_size, filter_size, stride):
       '''Returns new image size given previous image size and filter parameters'''
       new_size = int(math.ceil(float(image_size - filter_size + 1) / float(stride)))
