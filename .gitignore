@@ -57,3 +57,4 @@ desktop.ini
 
 # jupyter checkpoints
 .ipynb_checkpoints
+*.zip
