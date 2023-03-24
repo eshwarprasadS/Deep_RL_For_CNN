@@ -54,3 +54,6 @@ docs/_build/
 
 #desktop
 desktop.ini
+
+# jupyter checkpoints
+.ipynb_checkpoints
