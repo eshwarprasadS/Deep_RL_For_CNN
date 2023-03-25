@@ -37,7 +37,7 @@ class CNNEnv(gym.Env):
         self.test_data.targets = self.test_data.targets[test_idx]
 
         
-        self.layer_depth_limit = 7
+        self.layer_depth_limit = 8
         self.layer_depth = 0
         self.max_image_size_for_fc = 28
         self.current_image_size = 28 # change this after each action
@@ -212,7 +212,7 @@ class CNNEnv(gym.Env):
 
         # create a mask representing valid actions in each dimension
         #start with all actions disabled
-        md_mask = tuple([np.zeros(x,) for x in self.action_space.nvec])
+        md_mask = tuple([np.zeros(x, dtype=np.int8) for x in self.action_space.nvec])
 
         print('inside layer depth limit')
         # enable valid convolutions
@@ -296,7 +296,8 @@ class CNNEnv(gym.Env):
                 md_mask[self._state_elem_to_index["terminal"]][0] = 1
 
         # enable only layer_depth+1 action if layer depth limit is not reached
-        md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
+        if self.layer_depth < self.layer_depth_limit-1:
+            md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
 
 
         # mask = np.ones(self.action_space.n, dtype=np.int8)
@@ -444,7 +445,8 @@ class CNNEnv(gym.Env):
         else:
             reward = 0
 
-        self.layer_depth += 1    
+        if self.layer_depth < self.layer_depth_limit-1:
+            self.layer_depth += 1    
 
         self.current_state.append({
 
