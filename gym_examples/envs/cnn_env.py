@@ -38,18 +38,20 @@ class CNNEnv(gym.Env):
 
         
         self.layer_depth_limit = 8
-        self.layer_depth = 0
-        self.max_image_size_for_fc = 28
-        self.current_image_size = 28 # change this after each action
 
+        self.max_image_size_for_fc = 28
+
+        self.current_image_size = 28 # change this after each action
+        self.layer_depth = 0
         self.is_start_state = 1 #change this to 0 once we take the first action
+        self.cur_num_fc_layers = 0 
 
         self.fc_terminate = False
         self.allow_consecutive_pooling = False
         self.allow_initial_pooling = False
 
         self.max_fc_layers_allowed = 2
-        self.cur_num_fc_layers = 0 
+
 
         self.current_state = [] #array of dictionaries
 
@@ -164,7 +166,6 @@ class CNNEnv(gym.Env):
         # TODO: change this to a random conv layer, or random layer type or decide on how to initiate a dummy layer
         # self.current_image_size = self._calculate_image_size(self.current_image_size, 
         #                                                          self.current_state[-1])
-        self.current_image_size = 28
 
         self.current_state.append({
             
@@ -304,7 +305,11 @@ class CNNEnv(gym.Env):
         # mask[invalid_actions] = 0
 
         return md_mask
-
+    
+    def action_masks(self):
+        mask = self.get_valid_action_mask()
+        return [y for x in mask for y in x]
+    
     def _enable_convolution(self, md_mask, f, d):
         # print('inside enable conv')
         md_mask[self._state_elem_to_index["layer_type"]][self._layer_type_to_discrete["conv"]] = 1
@@ -373,8 +378,8 @@ class CNNEnv(gym.Env):
                 "current_network" : self.current_state,
                 "current_image_size": self.current_image_size, 
                 "current_layer_depth": self.layer_depth,
-                "current_num_fc_layers": self.cur_num_fc_layers
-                }
+                "current_num_fc_layers": self.cur_num_fc_layers,
+                "obs_vector": np.array(list(self._get_obs().values()))}
 
 
 
@@ -382,7 +387,24 @@ class CNNEnv(gym.Env):
         # Seed self.np_random
         super().reset(seed=seed)
 
-        self.is_start_state = 1
+        self.current_image_size = 28 # change this after each action
+        self.layer_depth = 0
+        self.is_start_state = 1 #change this to 0 once we take the first action
+        self.cur_num_fc_layers = 0 
+        self.current_state = [] #array of dictionaries
+
+        self.current_state.append({
+            
+            "layer_type": self._discrete_to_layer_type[0], # any, doesn't matter for conv 
+            "layer_depth": self.layer_depth, # any, doesn't matter for conv
+            "filter_depth": self._discrete_to_filter_depth[0], # any, doesn't matter for conv
+            "filter_size": self._discrete_to_filter_size[0], # any, doesn't matter for conv
+            "fc_size": self._discrete_to_fc_size[0], # any, doesn't matter for conv
+            "image_size": self.current_image_size, # 28
+            "pool_size": self._discrete_to_pool_size[0][0], # any, doesn't matter for conv
+            "pool_stride": self._discrete_to_pool_size[0][1], # any, doesn't matter for conv
+            "is_start": self.is_start_state # Yes, this is the start state
+        })
 
         observation = self._get_obs()
         info = self._get_info()
@@ -399,11 +421,63 @@ class CNNEnv(gym.Env):
 
         terminated = False
 
+        if self.layer_depth < self.layer_depth_limit-1:
+            self.layer_depth += 1    
+
+        layer = {
+            "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
+            "layer_depth": self.layer_depth, # Current depth of network (8 layers max)
+            "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
+            "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (0, 1,3,5) -- 0 is no filter
+            "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
+            "image_size": self.current_image_size,
+            "is_start": self.is_start_state,
+            "pool_size": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][0],
+            "pool_stride": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][1],
+        }
+
+
+        if layer["layer_type"] == "conv" or layer["layer_type"] == "pool":
+            self.current_image_size = self._calculate_image_size(self.current_image_size, 
+                                                                 layer)
+
+        layer["image_size"] = self.current_image_size
+        # if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
+        #     print('current_state layer type =', self.current_state[-1]["layer_type"])
+        #     self.current_image_size = self._calculate_image_size(self.current_image_size, 
+        #                                                          self.current_state[-1])
+
+        # self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
+        #                                                      self.current_state[-1]["filter_size"], 1)  
+        if layer["layer_type"] == "fc":
+            self.cur_num_fc_layers += 1
+
+        self.current_state.append(layer)
+        # self.current_state.append({
+
+        #     "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
+        #     "layer_depth": self.layer_depth, # Current depth of network (8 layers max)
+        #     "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
+        #     "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (0, 1,3,5) -- 0 is no filter
+        #     "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
+        #     "image_size": self.current_image_size,
+        #     "is_start": self.is_start_state,
+        #     "pool_size": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][0],
+        #     "pool_stride": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][1],
+        # })  
+
+        # terminate manually if no more layers can be added
+        mask = self.get_valid_action_mask()
+        if np.sum(mask[0]) == 0:
+            terminated = True
+
+        # terminate if action is to terminate
         if action[self._state_elem_to_index["terminal"]] == 1:
             terminated = True
 
         if terminated:
-
+            
+            print('network = ', self.current_state, 'terminated =', terminated)
             # Pass an array of tuple containing- 
             # layer_type, 
             # layer_depth, 
@@ -440,36 +514,11 @@ class CNNEnv(gym.Env):
                                     0,
                                     []
                                     ))
+            print('layersList = ', layersList)
             reward = generate_and_train(layersList, self.train_data, self.test_data)
 
         else:
             reward = 0
-
-        if self.layer_depth < self.layer_depth_limit-1:
-            self.layer_depth += 1    
-
-        self.current_state.append({
-
-            "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
-            "layer_depth": self.layer_depth, # Current depth of network (8 layers max)
-            "filter_depth": self._discrete_to_filter_depth[action[self._state_elem_to_index["filter_depth"]]], # Used for conv (0, 64, 128, 256, 512) -- 0 is no filter
-            "filter_size": self._discrete_to_filter_size[action[self._state_elem_to_index["filter_size"]]], # Used for conv and pool (0, 1,3,5) -- 0 is no filter
-            "fc_size": self._discrete_to_fc_size[action[self._state_elem_to_index["fc_size"]]],
-            "image_size": self.current_image_size,
-            "is_start": self.is_start_state,
-            "pool_size": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][0],
-            "pool_stride": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][1],
-        })  
-
-        if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "conv" or self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "pool":
-            print('current_state layer type =', self.current_state[-1]["layer_type"])
-            self.current_image_size = self._calculate_image_size(self.current_image_size, 
-                                                                 self.current_state[-1])
-
-        # self.current_image_size = self._calculate_image_size(self, self.current_image_size, 
-        #                                                      self.current_state[-1]["filter_size"], 1)  
-        if self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]] == "fc":
-            self.cur_num_fc_layers += 1
 
         observation = self._get_obs()
         info = self._get_info()
