@@ -1,63 +1,75 @@
 """
 Qlearner referred from https://github.com/bowenbaker/metaqnn/tree/a25847f635e9545455f83405453e740646038f7a/libs/grammar
 """
+from .policy import *
+
+from collections import defaultdict
+import numpy as np
+import os
 import pandas as pd
+import pickle
+from tqdm import tqdm
 
 
 class QLearner:
-    """All Q-Learning updates and policy generator
-    Args
-        state: The starting state for the QLearning Agent
-        q_values: A dictionary of q_values --
-                        keys: State tuples (State.as_tuple())
-                        values: [state list, qvalue list]
-        replay_dictionary: A pandas dataframe with columns: 'net' for net strings, and 'accuracy_best_val' for best accuracy
-                                    and 'accuracy_last_val' for last accuracy achieved
-        output_number : number of output neurons
-    """
+    """All Q-Learning updates and policy generator"""
 
-    def __init__(
-        self,
-        state_space_parameters,
-        epsilon,
-        state=None,
-        qstore=None,
-        replay_dictionary=pd.DataFrame(
-            columns=[
-                "net",
-                "accuracy_best_val",
-                "accuracy_last_val",
-                "accuracy_best_test",
-                "accuracy_last_test",
-                "ix_q_value_update",
-                "epsilon",
-            ]
-        ),
-    ):
-        self.state_list = []
+    def __init__(self, env, lr, epsilion, q_path, reply_memory_path, state=None):
+        """
+        q_path: path to the directory where the q table needs to be stored
+        replay_memory_path: path to the directory where the replay memory needs to be stored
+        """
+        self.env = env
+        self.state = state
+        self.lr = lr
+        self.epsilon = epsilion
 
-        self.state_space_parameters = state_space_parameters
+        self.q_path = q_path
+        self.replay_memory_path = reply_memory_path
 
-        # Class that will expand states for us
-        self.enum = se.StateEnumerator(state_space_parameters)
-        self.stringutils = StateStringUtils(state_space_parameters)
-
-        # Starting State
-        self.state = (
-            se.State("start", 0, 1, 0, 0, state_space_parameters.image_size, 0, 0)
-            if not state
-            else state
+        self.q_table_file_path = self.q_path + "_qtable_" + str(self.epsilon) + ".pkl"
+        self.replay_memory_file_path = (
+            self.replay_memory_path + "_rep_mem_" + str(self.epsilon) + ".pkl"
         )
-        self.bucketed_state = self.enum.bucket_state(self.state)
 
-        # Cached Q-Values -- used for q learning update and transition
-        self.qstore = QValues() if not qstore else qstore
-        self.replay_dictionary = replay_dictionary
+        self.initialize_q_table()
+        self.initialize_replay_memory()
 
-        self.epsilon = epsilon  # epsilon: parameter for epsilon greedy strategy
+    def initialize_q_table(self, enforce_new=False):
+        if enforce_new:
+            self._new_q_table()
+            return
 
-    def update_replay_database(self, new_replay_dic):
-        self.replay_dictionary = new_replay_dic
+        try:
+            self._load_q_table()
+        except:
+            self._new_q_table()
+        return
+
+    def _new_q_table(self):
+        self.Qtable = defaultdict(lambda: defaultdict(int))
+
+    def _load_q_table(self):
+        with open(self.q_table_file_path, "rb") as f:
+            self.Qtable = pickle.load(f)
+
+    def initialize_replay_memory(self, enforce_new=False):
+        if enforce_new:
+            self._new_replay_memory()
+            return
+
+        try:
+            self._load_replay_memory()
+        except:
+            self._new_replay_memory()
+        return
+
+    def _new_replay_memory(self):
+        self.replay_memory = []
+
+    def _load_replay_memory(self, path):
+        with open(self.replay_memory_file_path, "rb") as f:
+            self.replay_memory = pickle.load(f)
 
     def generate_net(self):
         # Have Q-Learning agent sample current policy to generate a network and convert network to string format
@@ -109,63 +121,6 @@ class QLearner:
             machine_run_on,
         )
 
-    def save_q(self, q_path):
-        self.qstore.save_to_csv(os.path.join(q_path, "q_values.csv"))
-
-    def _reset_for_new_walk(self):
-        """Reset the state for a new random walk"""
-        # Architecture String
-        self.state_list = []
-
-        # Starting State
-        self.state = se.State(
-            "start", 0, 1, 0, 0, self.state_space_parameters.image_size, 0, 0
-        )
-        self.bucketed_state = self.enum.bucket_state(self.state)
-
-    def _run_agent(self):
-        """Have Q-Learning agent sample current policy to generate a network"""
-        while self.state.terminate == 0:
-            self._transition_q_learning()
-
-        return self.state_list
-
-    def _transition_q_learning(self):
-        """Updates self.state according to an epsilon-greedy strategy"""
-        if self.bucketed_state.as_tuple() not in self.qstore.q:
-            self.enum.enumerate_state(self.bucketed_state, self.qstore.q)
-
-        action_values = self.qstore.q[self.bucketed_state.as_tuple()]
-        # epsilon greedy choice
-        if np.random.random() < self.epsilon:
-            action = se.State(
-                state_list=action_values["actions"][
-                    np.random.randint(len(action_values["actions"]))
-                ]
-            )
-        else:
-            max_q_value = max(action_values["utilities"])
-            max_q_indexes = [
-                i
-                for i in range(len(action_values["actions"]))
-                if action_values["utilities"][i] == max_q_value
-            ]
-            max_actions = [action_values["actions"][i] for i in max_q_indexes]
-            action = se.State(
-                state_list=max_actions[np.random.randint(len(max_actions))]
-            )
-
-        self.state = self.enum.state_action_transition(self.state, action)
-        self.bucketed_state = self.enum.bucket_state(self.state)
-
-        self._post_transition_updates()
-
-    def _post_transition_updates(self):
-        # State to go in state list
-        bucketed_state = self.bucketed_state.copy()
-
-        self.state_list.append(bucketed_state)
-
     def sample_replay_for_update(self):
         # Experience replay to update Q-Values
         for i in range(self.state_space_parameters.replay_number):
@@ -189,46 +144,93 @@ class QLearner:
                 state_list, self.accuracy_to_reward(accuracy_best_val)
             )
 
-    def accuracy_to_reward(self, acc):
-        """How to define reward from accuracy"""
-        return acc
+    def update_q_values(self, state_list, action_list, reward):
+        last_state, last_action = state_list[-1], action_list[-1]
 
-    def update_q_value_sequence(self, states, termination_reward):
-        """Update all Q-Values for a sequence."""
-        self._update_q_value(states[-2], states[-1], termination_reward)
-        for i in reversed(range(len(states) - 2)):
-            self._update_q_value(states[i], states[i + 1], 0)
+        self.Qtable[last_state][last_action] = (1 - self.lr) * self.Qtable[last_state][
+            last_action
+        ] + self.lr * reward
 
-    def _update_q_value(self, start_state, to_state, reward):
-        """Update a single Q-Value for start_state given the state we transitioned to and the reward."""
-        if start_state.as_tuple() not in self.qstore.q:
-            self.enum.enumerate_state(start_state, self.qstore.q)
-        if to_state.as_tuple() not in self.qstore.q:
-            self.enum.enumerate_state(to_state, self.qstore.q)
+        for i in range(len(state_list) - 2, -1, -1):
+            state, action = state_list[i], action_list[i]
+            next_state = state_list[i + 1]
+            a_max, u_max = greedy_policy(self.Qtable, self.env, next_state)
 
-        actions = self.qstore.q[start_state.as_tuple()]["actions"]
-        values = self.qstore.q[start_state.as_tuple()]["utilities"]
+            self.Qtable[state][action] = (1 - self.lr) * self.Qtable[state][
+                action
+            ] + self.lr * u_max
 
-        max_over_next_states = (
-            max(self.qstore.q[to_state.as_tuple()]["utilities"])
-            if to_state.terminate != 1
-            else 0
-        )
+    def train(self, n_training_episodes, replay_memory_size=10, write_to_disk=10):
+        for episode in tqdm(range(n_training_episodes)):
 
-        action_between_states = self.enum.transition_to_action(
-            start_state, to_state
-        ).as_tuple()
+            state, state_info = self.env.reset()
+            state = tuple(state_info["obs_vector"])
 
-        # Q_Learning update rule
-        values[actions.index(action_between_states)] = values[
-            actions.index(action_between_states)
-        ] + self.state_space_parameters.learning_rate * (
-            reward
-            + self.state_space_parameters.discount_factor * max_over_next_states
-            - values[actions.index(action_between_states)]
-        )
+            terminated = False
+            state_list = [state]
+            action_list = []
 
-        self.qstore.q[start_state.as_tuple()] = {
-            "actions": actions,
-            "utilities": values,
-        }
+            while not terminated:
+                action = epsilon_greedy_policy(
+                    self.Qtable, self.env, state, self.epsilon
+                )
+                action_list.append(action)
+                action = np.array(action, dtype=np.int64)
+                _, reward, terminated, _, state_info = self.env.step(action)
+                state = tuple(state_info["obs_vector"])
+                if not terminated:
+                    state_list.append(state)
+
+            self.replay_memory.append((state_list, action_list, reward))
+
+            # TODO: min(len(replay_memory), replay_mem_Size)
+            # Comments: I think if it was min they would've written it as min in the paper
+            for _ in range(replay_memory_size):
+                state_list, action_list, reward = self.replay_memory[
+                    np.random.choice(len(self.replay_memory))
+                ]
+                self.update_q_values(state_list, action_list, reward)
+
+            if not (episode % write_to_disk):
+                self.write_qtable_and_replay_memory()
+
+        return
+
+    def write_qtable_and_replay_memory(self):
+        if not self.q_path or not self.replay_memory_path:
+            raise Exception("Need Q Path and Replay Memory Path to write to disk")
+        with open(self.q_table_file_path, "wb") as f:
+            pickle.dump(self.Qtable, f)
+
+        with open(self.replay_memory_file_path, "wb") as f:
+            pickle.dump(self.replay_memory, f)
+
+    def run_experiment(self, esp_schedule=None, reinitialize_qtable=True):
+        # Start fresh when running experiment
+        self.initialize_q_table(enforce_new=True)
+        self.initialize_replay_memory(enforce_new=True)
+
+        if not esp_schedule:
+            esp_schedule = {
+                1.0: 15,
+                0.9: 15,
+                0.8: 15,
+                0.7: 15,
+                0.6: 15,
+                0.5: 15,
+                0.4: 15,
+                0.3: 15,
+                0.2: 15,
+                0.1: 15,
+            }
+        # Initialize new Qtable per experiment
+        for epsilion, n_training_eps in esp_schedule:
+            if reinitialize_qtable:
+                self.initialize_q_table(enforce_new=True)
+                self.initialize_replay_memory(enforce_new=True)
+            self.epsilon = epsilion
+            self.train(n_training_eps, epsilon=epsilion)
+
+        # After the experiement has been run, we'll have multiple Qtables,
+        # i.e best network for each epsilion with us
+        # TODO: Generate best networks and get best acc?

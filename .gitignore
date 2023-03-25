@@ -58,3 +58,4 @@ desktop.ini
 # jupyter checkpoints
 .ipynb_checkpoints
 *.zip
+qlearner_checkpoints
