@@ -15,7 +15,9 @@ from torchvision.transforms import ToTensor
 class CNNEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None):
+    def __init__(self, render_mode=None, verbose=True):
+
+        self.verbose = verbose
 
         self.train_data = datasets.MNIST(
                             root = 'data',
@@ -215,13 +217,13 @@ class CNNEnv(gym.Env):
         #start with all actions disabled
         md_mask = tuple([np.zeros(x, dtype=np.int8) for x in self.action_space.nvec])
 
-        print('inside layer depth limit')
+        # print('inside layer depth limit')
         # enable valid convolutions
         if self.is_start_state or \
             (self.is_start_state == False and self.current_state[-1]["layer_type"] in \
             set(["conv", "pool"])):
 
-            print('enabling convolutions')
+            # print('enabling convolutions')
             for d in list(self._discrete_to_filter_depth.keys())[1:]:
                 for f in self._valid_filter_sizes_for_image():
                     self._enable_convolution(md_mask, f, d)
@@ -241,7 +243,7 @@ class CNNEnv(gym.Env):
             (self.current_state[-1]["layer_type"] == "pool" and self.allow_consecutive_pooling))) or \
             (self.is_start_state and self.allow_initial_pooling): 
 
-            print('enabling valid pools')
+            # print('enabling valid pools')
             for f in self._valid_pooling_sizes_for_image():
                 self._enable_pooling(md_mask, f)
         else:
@@ -476,8 +478,8 @@ class CNNEnv(gym.Env):
             terminated = True
 
         if terminated:
-            
-            print('network = ', self.current_state, 'terminated =', terminated)
+            if self.verbose:
+                print('network = ', self.current_state[1:], 'terminated =', terminated)
             # Pass an array of tuple containing- 
             # layer_type, 
             # layer_depth, 
@@ -514,7 +516,7 @@ class CNNEnv(gym.Env):
                                     0,
                                     []
                                     ))
-            print('layersList = ', layersList)
+            # print('layersList = ', layersList)
             reward = generate_and_train(layersList, self.train_data, self.test_data)
 
         else:
