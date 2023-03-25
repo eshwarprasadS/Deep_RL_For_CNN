@@ -28,8 +28,11 @@ device=torch.device(0) if torch.cuda.is_available() else 'cpu'
 # TODO: Account for PADDING
 # NOTE: Make work for list params for image size, filter size etc (i.e. non square inputs) -> assuming all square currently
 
+# TODO: Account for PADDING -> assuming 0 for now
+# TODO: Make work for list params for image size, filter size etc (i.e. non square inputs) -> assuming square inputs
+
 class GenerateCNN(nn.Module):
-    def __init__(self, network_tuples, n_init_channels, n_classes=3):
+    def __init__(self, network_tuples, n_init_channels, n_classes=3, input_image_size=28):
       '''
       network_tuples: list of tuples defining network. Params:
         layer_type,        # String -- conv, pool, fc, softmax
@@ -47,21 +50,21 @@ class GenerateCNN(nn.Module):
       self.layers=nn.ModuleList()
 
       in_filter=None
-      running_image_size=None
+      running_image_size=input_image_size
       firstFC=True
       running_fc_size=None
 
       for i,state in enumerate(network_tuples):
         
         layer_type, layer_depth, filter_depth, filter_size, stride, image_size, fc_size, terminate, state_list = state
-        
-        # print(running_image_size, in_filter)
+        # print(layer_type, layer_depth, filter_depth, filter_size, stride, image_size, fc_size, terminate, state_list)
+        # print('running img size',running_image_size, 'infilters',in_filter)
         if layer_type=='conv':
           assert filter_depth != 0, "filter_depth to conv layer must be non-zero"
 
           if i==0:
             self.layers.append(nn.Conv2d(n_init_channels,filter_depth, filter_size, stride))
-            running_image_size=image_size
+            # running_image_size=image_size
           else:
             self.layers.append(nn.Conv2d(in_filter,filter_depth, filter_size, stride))
           in_filter=filter_depth
@@ -83,6 +86,8 @@ class GenerateCNN(nn.Module):
           # assert image_size == 0, "Image size to fc layer must be 0, is {}".format(image_size)
           if firstFC:
             firstFC=False
+            # print('image size',running_image_size)
+            # print('infilter',in_filter)
             image_size_unroll=running_image_size**2 # NOTE: assumption of only square images
             image_size_unroll*=in_filter
             # print('Unrolled img size:',image_size_unroll)
@@ -99,7 +104,7 @@ class GenerateCNN(nn.Module):
       # if lastlayer != FC -> Flatten -> Add FC with 3 Out
       lastlayer=self.layers[-1]
       if (isinstance(lastlayer, nn.Linear) and lastlayer.out_features!=n_classes):
-          print(lastlayer.out_features)
+          # print(lastlayer.out_features)
           # self.layers.append(nn.Flatten())
           self.layers.append(nn.Linear(lastlayer.out_features, n_classes))
           
@@ -121,17 +126,22 @@ class GenerateCNN(nn.Module):
       return new_size
 
     def forward(self, x):
+      
       for layer in self.layers:
         if isinstance(layer, nn.Conv2d):
           layer_type='conv'
         elif isinstance(layer, nn.MaxPool2d):
           layer_type='mp'
         elif isinstance(layer, nn.Linear):
+          layer_type='fc'
+
           x=x.view(x.shape[0],-1) #flatten before a linear layer
-        x=layer(x)
         # print(layer_type, x.shape)
+        x=layer(x)
+        # print('After',x.shape)
       
       return x
+
 
 def generate_and_train(model_architecture, train_data, test_data, input_channels=1, lr=0.01, num_epochs=5, verbose = False):
 
