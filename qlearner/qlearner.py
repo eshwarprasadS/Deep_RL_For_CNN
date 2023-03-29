@@ -4,6 +4,7 @@ Qlearner referred from https://github.com/bowenbaker/metaqnn/tree/a25847f635e954
 from .policy import *
 
 from collections import defaultdict
+import dill
 import numpy as np
 import os
 import pandas as pd
@@ -27,13 +28,13 @@ class QLearner:
         self.q_path = q_path
         self.replay_memory_path = reply_memory_path
 
-        self.q_table_file_path = self.q_path + "_qtable_" + str(self.epsilon) + ".pkl"
-        self.replay_memory_file_path = (
-            self.replay_memory_path + "_rep_mem_" + str(self.epsilon) + ".pkl"
-        )
+        self.q_table_file_path = self.q_path + "qtable_new.pkl"
+        self.replay_memory_file_path = self.replay_memory_path + "rep_mem_new.pkl"
 
         self.initialize_q_table()
         self.initialize_replay_memory()
+        self.ep_rewards = []
+        self.ep_len = []
 
     def initialize_q_table(self, enforce_new=False):
         if enforce_new:
@@ -51,7 +52,8 @@ class QLearner:
 
     def _load_q_table(self):
         with open(self.q_table_file_path, "rb") as f:
-            self.Qtable = pickle.load(f)
+            self.Qtable = dill.load(f)
+        print("Loaded qtable")
 
     def initialize_replay_memory(self, enforce_new=False):
         if enforce_new:
@@ -69,7 +71,8 @@ class QLearner:
 
     def _load_replay_memory(self, path):
         with open(self.replay_memory_file_path, "rb") as f:
-            self.replay_memory = pickle.load(f)
+            self.replay_memory = dill.load(f)
+        print("Loaded replay memory")
 
     def generate_net(self):
         # Have Q-Learning agent sample current policy to generate a network and convert network to string format
@@ -160,7 +163,7 @@ class QLearner:
                 action
             ] + self.lr * u_max
 
-    def train(self, n_training_episodes, replay_memory_size=10, write_to_disk=10):
+    def train(self, n_training_episodes, replay_memory_size=30, write_to_disk=5):
         for episode in tqdm(range(n_training_episodes)):
 
             state, state_info = self.env.reset()
@@ -180,6 +183,9 @@ class QLearner:
                 state = tuple(state_info["obs_vector"])
                 if not terminated:
                     state_list.append(state)
+            if terminated:
+                self.ep_rewards.append(reward)
+                self.ep_len.append(len(state_info.get("current_network", [])))
 
             self.replay_memory.append((state_list, action_list, reward))
 
@@ -191,7 +197,7 @@ class QLearner:
                 ]
                 self.update_q_values(state_list, action_list, reward)
 
-            if not (episode % write_to_disk):
+            if ((episode + 1) % write_to_disk) == 0:
                 self.write_qtable_and_replay_memory()
 
         return
@@ -200,10 +206,20 @@ class QLearner:
         if not self.q_path or not self.replay_memory_path:
             raise Exception("Need Q Path and Replay Memory Path to write to disk")
         with open(self.q_table_file_path, "wb") as f:
-            pickle.dump(self.Qtable, f)
-
+            dill.dump(self.Qtable, f)
         with open(self.replay_memory_file_path, "wb") as f:
-            pickle.dump(self.replay_memory, f)
+            dill.dump(self.replay_memory, f)
+        print(
+            "\nWriting q_table and replay_memory to disk for epsilon: {}".format(
+                self.epsilon
+            )
+        )
+        print(
+            "Mean ep len:",
+            np.average(self.ep_len),
+            "Mean ep reward",
+            np.average(self.ep_rewards),
+        )
 
     def run_experiment(self, esp_schedule=None, reinitialize_qtable=True):
         # Start fresh when running experiment
@@ -211,25 +227,11 @@ class QLearner:
         self.initialize_replay_memory(enforce_new=True)
 
         if not esp_schedule:
-            esp_schedule = {
-                1.0: 15,
-                0.9: 15,
-                0.8: 15,
-                0.7: 15,
-                0.6: 15,
-                0.5: 15,
-                0.4: 15,
-                0.3: 15,
-                0.2: 15,
-                0.1: 15,
-            }
+            esp_schedule = {0.5: 20, 0.2: 20, 0.1: 50}
         # Initialize new Qtable per experiment
-        for epsilion, n_training_eps in esp_schedule:
-            if reinitialize_qtable:
-                self.initialize_q_table(enforce_new=True)
-                self.initialize_replay_memory(enforce_new=True)
-            self.epsilon = epsilion
-            self.train(n_training_eps, epsilon=epsilion)
+        for epsilon, n_training_eps in esp_schedule.items():
+            self.epsilon = epsilon
+            self.train(n_training_eps)
 
         # After the experiement has been run, we'll have multiple Qtables,
         # i.e best network for each epsilion with us
