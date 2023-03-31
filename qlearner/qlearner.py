@@ -74,79 +74,6 @@ class QLearner:
             self.replay_memory = dill.load(f)
         print("Loaded replay memory")
 
-    def generate_net(self):
-        # Have Q-Learning agent sample current policy to generate a network and convert network to string format
-        self._reset_for_new_walk()
-        state_list = self._run_agent()
-        state_list = self.stringutils.add_drop_out_states(state_list)
-        net_string = self.stringutils.state_list_to_string(state_list)
-
-        # Check if we have already trained this model
-        if net_string in self.replay_dictionary["net"].values:
-            acc_best_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["accuracy_best_val"].values[0]
-            iter_best_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["iter_best_val"].values[0]
-            acc_last_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["accuracy_last_val"].values[0]
-            iter_last_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["iter_last_val"].values[0]
-            acc_best_test = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["accuracy_best_test"].values[0]
-            acc_last_test = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["accuracy_last_test"].values[0]
-            machine_run_on = self.replay_dictionary[
-                self.replay_dictionary["net"] == net_string
-            ]["machine_run_on"].values[0]
-        else:
-            acc_best_val = -1.0
-            iter_best_val = -1.0
-            acc_last_val = -1.0
-            iter_last_val = -1.0
-            acc_best_test = -1.0
-            acc_last_test = -1.0
-            machine_run_on = -1.0
-
-        return (
-            net_string,
-            acc_best_val,
-            iter_best_val,
-            acc_last_val,
-            iter_last_val,
-            acc_best_test,
-            acc_last_test,
-            machine_run_on,
-        )
-
-    def sample_replay_for_update(self):
-        # Experience replay to update Q-Values
-        for i in range(self.state_space_parameters.replay_number):
-            net = np.random.choice(self.replay_dictionary["net"])
-            accuracy_best_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net
-            ]["accuracy_best_val"].values[0]
-            accuracy_last_val = self.replay_dictionary[
-                self.replay_dictionary["net"] == net
-            ]["accuracy_last_val"].values[0]
-            state_list = self.stringutils.convert_model_string_to_states(
-                cnn.parse("net", net)
-            )
-
-            state_list = self.stringutils.remove_drop_out_states(state_list)
-
-            # Convert States so they are bucketed
-            state_list = [self.enum.bucket_state(state) for state in state_list]
-
-            self.update_q_value_sequence(
-                state_list, self.accuracy_to_reward(accuracy_best_val)
-            )
-
     def update_q_values(self, state_list, action_list, reward):
         last_state, last_action = state_list[-1], action_list[-1]
 
@@ -205,9 +132,9 @@ class QLearner:
     def write_qtable_and_replay_memory(self):
         if not self.q_path or not self.replay_memory_path:
             raise Exception("Need Q Path and Replay Memory Path to write to disk")
-        with open(self.q_table_file_path, "wb") as f:
+        with open(self.q_table_file_path, "wb+") as f:
             dill.dump(self.Qtable, f)
-        with open(self.replay_memory_file_path, "wb") as f:
+        with open(self.replay_memory_file_path, "wb+") as f:
             dill.dump(self.replay_memory, f)
         print(
             "\nWriting q_table and replay_memory to disk for epsilon: {}".format(
@@ -221,18 +148,24 @@ class QLearner:
             np.average(self.ep_rewards),
         )
 
-    def run_experiment(self, esp_schedule=None, reinitialize_qtable=True):
+    def run_experiment(self, eps_schedule=None, reinitialize_qtable=True):
         # Start fresh when running experiment
         self.initialize_q_table(enforce_new=True)
         self.initialize_replay_memory(enforce_new=True)
 
-        if not esp_schedule:
-            esp_schedule = {0.5: 20, 0.2: 20, 0.1: 50}
+        if not eps_schedule:
+            eps_schedule = {
+                1.0: 300,
+                0.5: 200, 
+                0.2: 200, 
+                0.1: 100}
         # Initialize new Qtable per experiment
-        for epsilon, n_training_eps in esp_schedule.items():
+        for epsilon, n_training_eps in eps_schedule.items():
             self.epsilon = epsilon
             self.train(n_training_eps)
+    
+    def save(self, file_dir):
+        with open(os.path.join(file_dir,f'q_learner_{len(self.ep_rewards)}.pkl') , "wb+") as file_handler:
+            dill.dump(self, file_handler)
 
-        # After the experiement has been run, we'll have multiple Qtables,
-        # i.e best network for each epsilion with us
-        # TODO: Generate best networks and get best acc?
+        # TODO: Generate best networks and get best accuracy
