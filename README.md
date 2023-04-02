@@ -1,5 +1,7 @@
-CNN env repo, inherited and designed off [of this documentaton](https://gymnasium.farama.org/tutorials/environment_creation/): 
-- `GridWorldEnv`: Simplistic implementation of gridworld environment
+CS566 Midterm Project Repository - QL Quartet - Building Neural Networks using Deep Reinforcement Learning
 
 Authors:
-- `Eshwar`: esivaram@usc.edu
+- `Eshwar`: esivaram@usc.edu,
+- `Aditya Srivastava`: adityasr@usc.edu
+- `Swarali Atul Joshi`: swaralia@usc.edu
+- `Abhiruchi Bhattacharya`: abhiruch@usc.edu
