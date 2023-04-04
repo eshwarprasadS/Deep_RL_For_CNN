@@ -143,9 +143,11 @@ class GenerateCNN(nn.Module):
       return x
 
 
-def generate_and_train(model_architecture, train_data, test_data, input_channels=1, lr=0.01, num_epochs=5, verbose = False):
-
-  model = GenerateCNN(model_architecture, input_channels)
+def generate_and_train(model_architecture, train_data, test_data, dataset_name="mnist", n_classes=3, lr=0.01, num_epochs=5, verbose = False):
+  input_channels, input_image_size=1,28
+  if "cifar10" in dataset_name:
+     input_channels, input_image_size=3,32
+  model = GenerateCNN(model_architecture, input_channels, n_classes, input_image_size)
   if verbose:
     print(model)
   model.to(device)
@@ -234,4 +236,4 @@ if __name__=="__main__":
       transform = ToTensor()
   )
 
-  generate_and_train([('conv',1,5,3,1,28,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('conv',1,10,3,1,26,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('fc',0,0,0,0,0,100,0,[]),('fc',0,0,0,0,0,10,0,[])], train_data, test_data)
+  generate_and_train([('conv',1,5,3,1,28,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('conv',1,10,3,1,26,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('fc',0,0,0,0,0,100,0,[]),('fc',0,0,0,0,0,10,0,[])], train_data, test_data, n_classes=10, verbose=True)
