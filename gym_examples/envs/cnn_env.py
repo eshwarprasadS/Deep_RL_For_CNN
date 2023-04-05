@@ -6,6 +6,7 @@ import math
 from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+import torch
 
 # TODO: Implement approach B for start state
 # TODO: Terminal transition from every state
@@ -15,29 +16,58 @@ from torchvision.transforms import ToTensor
 class CNNEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, verbose=True):
+    def __init__(self, render_mode=None, verbose=True, dataset = 'mnist'):
+        super(CNNEnv, self).__init__()
 
+        self.dataset = dataset    
         self.verbose = verbose
 
-        self.train_data = datasets.MNIST(
-                            root = 'data',
-                            train = True,
-                            transform = ToTensor(),
-                            download = True,
-                            )
-        self.test_data = datasets.MNIST(
-                            root = 'data',
-                            train = False,
-                            transform = ToTensor()
-                            )
-        train_idx = (self.train_data.targets==0) | (self.train_data.targets==1) | (self.train_data.targets==2)
-        test_idx = (self.test_data.targets==0) | (self.test_data.targets==1) | (self.test_data.targets==2)
+        if self.dataset == 'mnist':
+        
+            self.train_data = datasets.MNIST(
+                                root = 'data',
+                                train = True,
+                                transform = ToTensor(),
+                                download = True,
+                                )
+            self.test_data = datasets.MNIST(
+                                root = 'data',
+                                train = False,
+                                transform = ToTensor()
+                                )
+            train_idx = (self.train_data.targets==0) | (self.train_data.targets==1) | (self.train_data.targets==2)
+            test_idx = (self.test_data.targets==0) | (self.test_data.targets==1) | (self.test_data.targets==2)
 
-        self.train_data.data = self.train_data.data[train_idx]
-        self.train_data.targets = self.train_data.targets[train_idx]
-        self.test_data.data = self.test_data.data[test_idx]
-        self.test_data.targets = self.test_data.targets[test_idx]
+            self.train_data.data = self.train_data.data[train_idx]
+            self.train_data.targets = self.train_data.targets[train_idx]
+            self.test_data.data = self.test_data.data[test_idx]
+            self.test_data.targets = self.test_data.targets[test_idx]
+        
+        elif self.dataset == 'cifar10':
 
+            self.train_data = datasets.CIFAR10(
+                                root = 'data',
+                                train = True,
+                                transform = ToTensor(),
+                                download = True,
+                                )
+            self.test_data = datasets.CIFAR10(
+                                root = 'data',
+                                train = False,
+                                transform = ToTensor()
+                                )
+            subset_targets = [0, 1, 2, 3, 4]
+
+            self.train_data.targets = np.array(self.train_data.targets)
+            self.test_data.targets = np.array(self.test_data.targets)
+
+            train_idx = np.isin(self.train_data.targets, subset_targets)
+            test_idx = np.isin(self.test_data.targets, subset_targets)
+
+            self.train_data.data = self.train_data.data[train_idx]
+            self.train_data.targets = torch.from_numpy(self.train_data.targets[train_idx]).type(torch.LongTensor)
+            self.test_data.data = self.test_data.data[test_idx]
+            self.test_data.targets = torch.from_numpy(self.test_data.targets[test_idx]).type(torch.LongTensor)
 
         self.layer_depth_limit = 8
 
@@ -515,7 +545,11 @@ class CNNEnv(gym.Env):
                                     []
                                     ))
             # print('layersList = ', layersList)
-            reward = generate_and_train(layersList, self.train_data, self.test_data)
+            if self.dataset == "mnist":
+                reward = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=3)
+            elif self.dataset == "cifar10":
+                print('network = ', layersList, 'terminated =', terminated)
+                reward = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=5)
             if self.verbose:
                 print('network = ', self.current_state[1:], 'terminated =', terminated, 'reward =', reward)
 

@@ -154,11 +154,16 @@ class QLearner:
         self.initialize_replay_memory(enforce_new=True)
 
         if not eps_schedule:
+            # eps_schedule = {
+            #     1.0: 300,
+            #     0.5: 200, 
+            #     0.2: 200, 
+            #     0.1: 100}
             eps_schedule = {
-                1.0: 300,
-                0.5: 200, 
-                0.2: 200, 
-                0.1: 100}
+                1.0: 1,
+                0.5: 1, 
+                0.2: 1, 
+                0.1: 1}
         # Initialize new Qtable per experiment
         for epsilon, n_training_eps in eps_schedule.items():
             self.epsilon = epsilon
