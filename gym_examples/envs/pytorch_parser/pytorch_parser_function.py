@@ -7,6 +7,8 @@ Original file is located at
     https://colab.research.google.com/drive/1BUg1tfReM7GuHCPipgwj5NiQgkZ0MegO
 """
 
+import datetime
+import json
 import torch
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
@@ -25,11 +27,11 @@ torch.manual_seed(1)
 
 device=torch.device(0) if torch.cuda.is_available() else 'cpu'
 
-# TODO: Account for PADDING
+
 # NOTE: Make work for list params for image size, filter size etc (i.e. non square inputs) -> assuming all square currently
 
 # TODO: Account for PADDING -> assuming 0 for now
-# TODO: Make work for list params for image size, filter size etc (i.e. non square inputs) -> assuming square inputs
+
 
 class GenerateCNN(nn.Module):
     def __init__(self, network_tuples, n_init_channels, n_classes=3, input_image_size=28):
@@ -141,15 +143,23 @@ class GenerateCNN(nn.Module):
         # print('After',x.shape)
       
       return x
+    
+# https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/24
+def n_params(model):
+  return sum(p.numel() for p in model.parameters() if p.requires_grad)
+       
 
 
-def generate_and_train(model_architecture, train_data, test_data, dataset_name="mnist", n_classes=3, lr=0.01, num_epochs=5, verbose = False):
+def generate_and_train(model_architecture, train_data, test_data, data_path=None, run_name=None, dataset_name="mnist", n_classes=3, lr=0.01, num_epochs=5, verbose = False):
   input_channels, input_image_size=1,28
   if "cifar10" in dataset_name:
      input_channels, input_image_size=3,32
   model = GenerateCNN(model_architecture, input_channels, n_classes, input_image_size)
+  model_size=n_params(model)
   if verbose:
     print(model)
+    print('Number of trainable parameters: %d' % (model_size))
+    
   model.to(device)
 
   loaders = {
@@ -212,12 +222,26 @@ def generate_and_train(model_architecture, train_data, test_data, dataset_name="
           labels=labels.to(device)
           test_output= model(images)
           pred_y = torch.max(test_output, 1)[1].data.squeeze()
-          accuracy += (pred_y == labels).sum().item()
+          correct += (pred_y == labels).sum().item()
           total+=float(labels.size(0))
-
+  accuracy=correct/total
   if verbose:        
-    print('Test Accuracy of the model on the 10000 test images: %.4f' % (accuracy/total))
-  return accuracy/total
+    print('Test Accuracy of the model on test images: %.4f' % (accuracy))
+
+  if data_path:
+    timestamp=int(datetime.datetime.now().timestamp())
+
+    filename=data_path+"/{}_{}_{}_{}.json".format(dataset_name, n_classes, run_name,str(timestamp))
+    write_dict={
+      "network_tuples":model_architecture,
+      "accuracy": accuracy,
+      "model_size":model_size,
+      "dataset":dataset_name
+    }
+    with open(filename, 'w+') as f:
+      json.dump(write_dict, f)
+
+  return accuracy, model_size
 
 # https://medium.com/@nutanbhogendrasharma/pytorch-convolutional-neural-network-with-mnist-dataset-4e8a4265e118
 
@@ -250,9 +274,9 @@ if __name__=="__main__":
   #  MNIST_10
   # generate_and_train([('conv',1,5,3,1,28,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('conv',1,10,3,1,26,0,0,[]), \
   #                     ('pool',1,0,2,2,28,0,0,[]),('fc',0,0,0,0,0,100,0,[]),('fc',0,0,0,0,0,10,0,[])], \
-  #                       train_data, test_data, n_classes=10, verbose=True)
+  #                       train_data, test_data, n_classes=10, num_epochs=1, verbose=True)
   
   # CIFAR
   generate_and_train(  [('conv', 1, 20, 3, 1, 26, 0, 0, []), ('pool', 2, 20, 2, 2, 13, 512, 0, []), ('conv', 3, 32, 3, 1, 11, 512, 0, []), ('fc', 4, 10, 3, 2, 11, 64, 0, [])],
-                        cifar_trainset, cifar_testset, dataset_name='cifar10', n_classes=10, verbose=True)
+                        cifar_trainset, cifar_testset, dataset_name='cifar10', n_classes=10, num_epochs=1, verbose=True, data_path=".", run_name="1")
   
