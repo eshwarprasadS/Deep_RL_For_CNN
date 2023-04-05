@@ -19,7 +19,7 @@ from torch.autograd import Variable
 
 import numpy as np
 from torchvision import datasets
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose, Normalize
 
 torch.manual_seed(1)
 
@@ -236,4 +236,23 @@ if __name__=="__main__":
       transform = ToTensor()
   )
 
-  generate_and_train([('conv',1,5,3,1,28,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('conv',1,10,3,1,26,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('fc',0,0,0,0,0,100,0,[]),('fc',0,0,0,0,0,10,0,[])], train_data, test_data, n_classes=10, verbose=True)
+  transform = Compose(
+    [ToTensor(),
+     Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+  
+  cifar_trainset = datasets.CIFAR10(root='./data', train=True,
+                                        download=True, transform=transform)
+
+  cifar_testset = datasets.CIFAR10(root='./data', train=False,
+                                        download=True, transform=transform)
+  
+
+  #  MNIST_10
+  # generate_and_train([('conv',1,5,3,1,28,0,0,[]),('pool',1,0,2,2,28,0,0,[]),('conv',1,10,3,1,26,0,0,[]), \
+  #                     ('pool',1,0,2,2,28,0,0,[]),('fc',0,0,0,0,0,100,0,[]),('fc',0,0,0,0,0,10,0,[])], \
+  #                       train_data, test_data, n_classes=10, verbose=True)
+  
+  # CIFAR
+  generate_and_train(  [('conv', 1, 20, 3, 1, 26, 0, 0, []), ('pool', 2, 20, 2, 2, 13, 512, 0, []), ('conv', 3, 32, 3, 1, 11, 512, 0, []), ('fc', 4, 10, 3, 2, 11, 64, 0, [])],
+                        cifar_trainset, cifar_testset, dataset_name='cifar10', n_classes=10, verbose=True)
+  
