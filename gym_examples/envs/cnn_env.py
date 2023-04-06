@@ -546,10 +546,10 @@ class CNNEnv(gym.Env):
                                     ))
             # print('layersList = ', layersList)
             if self.dataset == "mnist":
-                reward = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=3)
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=3)
             elif self.dataset == "cifar10":
                 print('network = ', layersList, 'terminated =', terminated)
-                reward = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=5)
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, dataset_name=self.dataset, n_classes=5)
             if self.verbose:
                 print('network = ', self.current_state[1:], 'terminated =', terminated, 'reward =', reward)
 
