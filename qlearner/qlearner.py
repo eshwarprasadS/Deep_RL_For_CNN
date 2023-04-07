@@ -35,6 +35,7 @@ class QLearner:
         self.initialize_replay_memory()
         self.ep_rewards = []
         self.ep_len = []
+        self.model_sizes = []
 
     def initialize_q_table(self, enforce_new=False):
         if enforce_new:
@@ -111,6 +112,7 @@ class QLearner:
                 if not terminated:
                     state_list.append(state)
             if terminated:
+                self.model_sizes.append(state_info["model_size"])
                 self.ep_rewards.append(reward)
                 self.ep_len.append(len(state_info.get("current_network", [])))
 

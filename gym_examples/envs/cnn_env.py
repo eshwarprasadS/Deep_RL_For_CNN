@@ -16,9 +16,11 @@ import torch
 class CNNEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, verbose=True, dataset = 'mnist'):
+    def __init__(self, render_mode=None, verbose=True, dataset = 'mnist', run_name = 'test', cnn_save_dir = None):
         super(CNNEnv, self).__init__()
 
+        self.cnn_save_dir = cnn_save_dir
+        self.run_name = run_name    
         self.dataset = dataset    
         self.verbose = verbose
 
@@ -70,7 +72,7 @@ class CNNEnv(gym.Env):
             self.test_data.targets = torch.from_numpy(self.test_data.targets[test_idx]).type(torch.LongTensor)
 
         self.layer_depth_limit = 8
-
+        self.model_size = 0
         self.max_image_size_for_fc = 28
 
         self.current_image_size = 28 # change this after each action
@@ -411,7 +413,8 @@ class CNNEnv(gym.Env):
                 "current_image_size": self.current_image_size,
                 "current_layer_depth": self.layer_depth,
                 "current_num_fc_layers": self.cur_num_fc_layers,
-                "obs_vector": np.array(list(self._get_obs().values()))}
+                "obs_vector": np.array(list(self._get_obs().values())),
+                "model_size": self.model_size}
 
 
 
@@ -424,6 +427,7 @@ class CNNEnv(gym.Env):
         self.is_start_state = 1 #change this to 0 once we take the first action
         self.cur_num_fc_layers = 0
         self.current_state = [] #array of dictionaries
+        self.model_size = 0
 
         self.current_state.append({
 
@@ -546,16 +550,17 @@ class CNNEnv(gym.Env):
                                     ))
             # print('layersList = ', layersList)
             if self.dataset == "mnist":
-                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path='logs/qlearner/', run_name='ql_test_1', dataset_name=self.dataset, n_classes=3)
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3)
+                self.model_size = model_size
             elif self.dataset == "cifar10":
-                print('network = ', layersList, 'terminated =', terminated)
-                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path='logs/qlearner/', run_name='ql_test_1', dataset_name=self.dataset, n_classes=5)
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
+                self.model_size = model_size
             if self.verbose:
                 print('network = ', self.current_state[1:], 'terminated =', terminated, 'reward =', reward)
 
         else:
-            reward = 0
-
+            reward = 0     
+            self.model_size = 0       
         observation = self._get_obs()
         info = self._get_info()
 
