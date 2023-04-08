@@ -45,7 +45,7 @@ class CNNEnv(gym.Env):
             self.test_data.data = self.test_data.data[test_idx]
             self.test_data.targets = self.test_data.targets[test_idx]
         
-        elif self.dataset == 'cifar10':
+        elif self.dataset == 'cifar':
 
             self.train_data = datasets.CIFAR10(
                                 root = 'data',
@@ -552,7 +552,7 @@ class CNNEnv(gym.Env):
             if self.dataset == "mnist":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3)
                 self.model_size = model_size
-            elif self.dataset == "cifar10":
+            elif self.dataset == "cifar":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
                 self.model_size = model_size
             if self.verbose:
