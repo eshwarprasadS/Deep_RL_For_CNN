@@ -430,7 +430,11 @@ class CNNEnv(gym.Env):
         # Seed self.np_random
         super().reset(seed=seed)
 
-        self.current_image_size = 28 # change this after each action
+        if self.dataset == 'mnist':
+            self.current_image_size = 28 # change this after each action
+        elif self.dataset == 'cifar':
+            self.current_image_size = 32
+                
         self.layer_depth = 0
         self.is_start_state = 1 #change this to 0 once we take the first action
         self.cur_num_fc_layers = 0
