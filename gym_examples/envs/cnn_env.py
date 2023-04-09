@@ -561,6 +561,7 @@ class CNNEnv(gym.Env):
                                     []
                                     ))
             # print('layersList = ', layersList)
+            print('network before train = ', self.current_state[1:], 'terminated =', terminated)
             if self.dataset == "mnist":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3)
                 self.model_size = model_size
@@ -568,7 +569,7 @@ class CNNEnv(gym.Env):
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
                 self.model_size = model_size
             if self.verbose:
-                print('network = ', self.current_state[1:], 'terminated =', terminated, 'reward =', reward)
+                print('reward =', reward)
 
         else:
             reward = 0     
