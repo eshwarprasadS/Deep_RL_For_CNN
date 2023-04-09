@@ -73,9 +73,17 @@ class CNNEnv(gym.Env):
 
         self.layer_depth_limit = 8
         self.model_size = 0
-        self.max_image_size_for_fc = 28
 
-        self.current_image_size = 28 # change this after each action
+        if self.dataset == 'mnist':
+            self.max_image_size_for_fc = 28
+        elif self.dataset == 'cifar':
+            self.max_image_size_for_fc = 32   
+
+        if self.dataset == 'mnist':
+            self.current_image_size = 28 # change this after each action
+        elif self.dataset == 'cifar':
+            self.current_image_size = 32
+
         self.layer_depth = 0
         self.is_start_state = 1 #change this to 0 once we take the first action
         self.cur_num_fc_layers = 0
