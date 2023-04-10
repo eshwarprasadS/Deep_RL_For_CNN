@@ -339,7 +339,7 @@ class CNNEnv(gym.Env):
                 md_mask[self._state_elem_to_index["terminal"]][0] = 1
 
         # enable only layer_depth+1 action if layer depth limit is not reached
-        if self.layer_depth < self.layer_depth_limit-1:
+        if self.layer_depth < self.layer_depth_limit:
             md_mask[self._state_elem_to_index["layer_depth"]][self.layer_depth+1] = 1
 
 
@@ -471,6 +471,7 @@ class CNNEnv(gym.Env):
 
         if self.layer_depth < self.layer_depth_limit-1:
             self.layer_depth += 1
+            assert self.layer_depth == action[self._state_elem_to_index["layer_depth"]]
 
         layer = {
             "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
