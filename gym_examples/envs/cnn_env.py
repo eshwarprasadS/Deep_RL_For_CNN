@@ -516,9 +516,14 @@ class CNNEnv(gym.Env):
         # })
 
         # terminate manually if no more layers can be added
-        mask = self.get_valid_action_mask()
-        if np.sum(mask[0]) == 0:
-            terminated = True
+        # mask = self.get_valid_action_mask()
+        # if np.sum(mask[0]) == 0:
+        #     terminated = True
+
+        # terminate manually if no more options are available for any of the discrete actions
+        for m in self.get_valid_action_mask():
+            if np.sum(m) == 0:
+                terminated = True
 
         # terminate if action is to terminate
         if action[self._state_elem_to_index["terminal"]] == 1:
