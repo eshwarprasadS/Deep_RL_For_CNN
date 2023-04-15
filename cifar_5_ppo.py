@@ -41,4 +41,4 @@ model = MaskablePPO(MaskableActorCriticPolicy, FlattenObservation(env), verbose 
                     tensorboard_log=TENSORBOARD_DIR,
                     n_steps=32)
 
-model.learn(total_timesteps=7000, progress_bar=True)
+model.learn(total_timesteps=7000, callback=checkpoint_callback, progress_bar=True)
