@@ -25,6 +25,8 @@ def epsilon_greedy_policy(Qtable, env, state, epsilon):
         action, _ = greedy_policy(Qtable, env, state)
     else:
         action = tuple(env.action_space.sample(env.get_valid_action_mask()))
-        Qtable[state][action] = 0
+
+        if (state not in Qtable) or (action not in Qtable[state]):
+            Qtable[state][action] = 0
 
     return action
