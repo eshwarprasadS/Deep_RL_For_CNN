@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from tqdm import tqdm
+from policy import *
+
 def running_average(arr):
     new_arr = []
     avg = 0.0
@@ -42,3 +45,29 @@ def plot_mean_episode_length(agent, figures_dir):
     plt.title('mean episode length')
     plt.legend(["mean ep length", "mean ep length smoothed"])
     plt.savefig(os.path.join(figures_dir,f'qlearner_{len(agent.ep_rewards)}_mean_episode_length.pdf'))
+
+def eval_qlearner(Qtable, env, n, epsilon):
+
+    episode_rewards = []
+    for episode in tqdm(range(n)):
+
+        state, state_info = env.reset()
+        state = tuple(state_info["obs_vector"])
+
+        terminated = False
+
+        while not terminated:
+            action = epsilon_greedy_policy(
+                Qtable, env, state, epsilon
+            )
+            action = np.array(action, dtype=np.int64)
+            _, reward, terminated, _, state_info = env.step(action)
+            state = tuple(state_info["obs_vector"])
+        
+        if terminated:
+            episode_rewards.append(reward)
+
+    mean_reward = np.mean(episode_rewards)
+    std_reward = np.std(episode_rewards)
+
+    return mean_reward, std_reward
