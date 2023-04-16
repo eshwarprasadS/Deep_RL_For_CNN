@@ -268,8 +268,8 @@ class CNNEnv(gym.Env):
                 for f in self._valid_filter_sizes_for_image():
                     self._enable_convolution(md_mask, f, d)
 
-        else:
-            # enable only 0 filter depth and 0 filter size as convolutions are not allowed
+        else: #non start, FC layer: disable convolutions
+            # enable only 0 filter depth and 0 filter size as convolutions are not allowed from FC layers
             md_mask[self._state_elem_to_index["filter_depth"]][0] = 1
             md_mask[self._state_elem_to_index["filter_size"]][0] = 1
 
@@ -437,6 +437,7 @@ class CNNEnv(gym.Env):
                 
         self.layer_depth = 0
         self.is_start_state = 1 #change this to 0 once we take the first action
+        self.fc_terminate = False
         self.cur_num_fc_layers = 0
         self.current_state = [] #array of dictionaries
         self.model_size = 0
@@ -569,7 +570,7 @@ class CNNEnv(gym.Env):
             # print('layersList = ', layersList)
             print('network before train = ', self.current_state[1:], 'terminated =', terminated)
             if self.dataset == "mnist":
-                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3)
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3, verbose=True)
                 self.model_size = model_size
             elif self.dataset == "cifar":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
