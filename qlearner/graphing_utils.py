@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
-from policy import *
+from .policy import *
 
 def running_average(arr):
     new_arr = []
