@@ -277,6 +277,6 @@ if __name__=="__main__":
   #                       train_data, test_data, n_classes=10, num_epochs=1, verbose=True)
   
   # CIFAR
-  generate_and_train(  [('conv', 1, 20, 3, 1, 26, 0, 0, []), ('pool', 2, 20, 2, 2, 13, 512, 0, []), ('conv', 3, 32, 3, 1, 11, 512, 0, []), ('fc', 4, 10, 3, 2, 11, 64, 0, [])],
-                        cifar_trainset, cifar_testset, dataset_name='cifar', n_classes=10, num_epochs=1, verbose=True, data_path=".", run_name="1")
+  # generate_and_train(  [('conv', 1, 20, 3, 1, 26, 0, 0, []), ('pool', 2, 20, 2, 2, 13, 512, 0, []), ('conv', 3, 32, 3, 1, 11, 512, 0, []), ('fc', 4, 10, 3, 2, 11, 64, 0, [])],
+  #                       cifar_trainset, cifar_testset, dataset_name='cifar', n_classes=10, num_epochs=1, verbose=True, data_path=".", run_name="1")
   

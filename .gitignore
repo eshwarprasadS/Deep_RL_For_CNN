@@ -62,3 +62,7 @@ desktop.ini
 *.zip
 qlearner_checkpoints
 output.*
+
+# CARC runs
+ppo_logs_april_17/
+qlearner_logs_april_17/

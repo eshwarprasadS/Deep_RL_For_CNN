@@ -23,9 +23,10 @@ def smooth(scalars, weight=0.9):  # Weight between 0 and 1
     return smoothed
 
 def plot_mean_rewards(agent, figures_dir):
+    plt.figure()
     x = [(i+1)*np.mean(agent.ep_len) for i in np.arange(len(agent.ep_rewards))]
     y = running_average(agent.ep_rewards)
-
+    
     plt.plot(x, y, alpha=0.3)
     plt.plot(x, smooth(y, .9))
     plt.xlabel('iterations')
@@ -35,6 +36,7 @@ def plot_mean_rewards(agent, figures_dir):
     plt.savefig(os.path.join(figures_dir,f'qlearner_{len(agent.ep_rewards)}_mean_rewards.pdf'))
 
 def plot_mean_episode_length(agent, figures_dir):
+    plt.figure()
     x = [(i+1)*np.mean(agent.ep_len) for i in np.arange(len(agent.ep_rewards))]
     y = running_average(agent.ep_len)
 
@@ -71,3 +73,16 @@ def eval_qlearner(Qtable, env, n, epsilon):
     std_reward = np.std(episode_rewards)
 
     return mean_reward, std_reward
+
+def plot_raw_episode_rewards(agent, figures_dir):
+    plt.figure()
+    x = [(i+1)*np.mean(agent.ep_len) for i in np.arange(len(agent.ep_rewards))]
+    y = agent.ep_rewards
+    # print('last mean reward',y[-1])
+    plt.plot(x, y, alpha=0.3)
+    plt.plot(x, smooth(y, .9))
+    plt.xlabel('iterations')
+    plt.ylabel('episode reward')
+    plt.title('episode reward')
+    plt.legend(["ep rewards", "ep rewards smoothed"])
+    plt.savefig(os.path.join(figures_dir,f'qlearner_{len(agent.ep_rewards)}_raw_rewards.pdf'))
