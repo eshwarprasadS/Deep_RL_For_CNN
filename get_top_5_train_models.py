@@ -5,6 +5,8 @@ from qlearner import qlearner
 from qlearner.policy import*
 from qlearner.graphing_utils import*
 
+from itertools import groupby
+
 # import gym_examples
 # import gym
 # import numpy as np
@@ -35,12 +37,21 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-p','--path', dest='path',type=str, help='path for directory containing cnn folder with json files')
 
 args=parser.parse_intermixed_args()
+if 'ppo' in args.path:
+    FIGURES_DIR="logs\ppo"
 
 print(args.path)
-# QL_PATH='./qlearner_finished_carc/qlearner'
-# PPO_PATH='./ppo_finished_carc/ppo'
 
 PATH=args.path
+
+def print_model(trajectory):
+    model, reward, nparams=trajectory
+    for layer in model:
+        # print('LAYER',layer)
+        layer_type, layer_depth, filter_depth, filter_size, stride, image_size, fc_size, terminate, state_list = layer
+        
+        print('{}\t filter_depth:{} \tfilter_size:{},\t stride:{},\tfc_size:{}'.format(layer_type,filter_depth,filter_size,stride,fc_size))
+    print("Accuracy:{}\tN_params:{}\n================".format(reward,nparams))
 
 top_list=[]
 ep_len_list=[]
@@ -49,7 +60,6 @@ ep_reward_list=[]
 # frequency distribution of layer depths 1-8
 freq_dist={i:0 for i in range(1,9)}
 print(freq_dist)
-# ppo_top_5=[]
 
 avg_len=0
 total=0
@@ -88,14 +98,34 @@ agent.ep_len=ep_len_list[500:]
 agent.ep_rewards=ep_reward_list[500:]
 
 top_list.sort(key=lambda tup: tup[1], reverse=True)
-print('TOP 5 MODELS:')
-for printstr in ['{}\n'.format(i) for i in top_list[:5]]:
-    print(printstr)
+print('TOP 20 MODELS:')
+for i in top_list[:20]:
+    print_model(i)
 
-print('Avg. length:', avg_len/total)
 
-print('Freq dist:', freq_dist)
 
-plot_mean_rewards(agent, FIGURES_DIR)
-plot_mean_episode_length(agent, FIGURES_DIR)
-plot_raw_episode_rewards(agent, FIGURES_DIR)
+print('\nAvg. length:', avg_len/total)
+
+print('\nFreq dist:', freq_dist)
+
+
+print('\n\n================TOP UNIQUE MODELS')
+# https://stackoverflow.com/questions/31499259/making-a-sequence-of-tuples-unique-by-a-specific-element
+def unique_by_key(elements, key=None):
+    if key is None:
+        key = lambda e: e
+    return {key(el): el for el in elements}.values()
+
+
+#  assuming I'll get at least 5 unique models from top 20
+unique_models=list(unique_by_key(top_list[:20], key=lambda x:x[2]))
+# print(unique_models[0])
+unique_models=sorted(unique_models,key=lambda x:x[1], reverse=True)
+for i in unique_models:
+    print_model(i)
+
+# plot_mean_rewards(agent, FIGURES_DIR)
+# plot_mean_episode_length(agent, FIGURES_DIR)
+# plot_raw_episode_rewards(agent, FIGURES_DIR)
+
+
