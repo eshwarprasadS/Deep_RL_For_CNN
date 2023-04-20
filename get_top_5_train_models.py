@@ -116,13 +116,36 @@ def unique_by_key(elements, key=None):
         key = lambda e: e
     return {key(el): el for el in elements}.values()
 
-
+"""
 #  assuming I'll get at least 5 unique models from top 20
 unique_models=list(unique_by_key(top_list[:20], key=lambda x:x[2]))
 # print(unique_models[0])
 unique_models=sorted(unique_models,key=lambda x:x[1], reverse=True)
 for i in unique_models:
     print_model(i)
+"""
+
+top_models = {}
+
+for i in top_list[:20]:
+    model, reward, nparams = i
+    if nparams not in top_models:
+        top_models[nparams] = i
+    else:
+        ex_m, ex_r, ex_np = top_models[nparams]
+        if ex_r < reward:
+            top_models[nparams] = i
+
+list_top_models = []
+
+for nparams in top_models:
+    list_top_models.append(top_models[nparams])
+
+print("Top performing models are:")
+list_top_models.sort(key = lambda tup : tup[1], reverse=True)
+for i in list_top_models:
+    print_model(i)
+
 
 # plot_mean_rewards(agent, FIGURES_DIR)
 # plot_mean_episode_length(agent, FIGURES_DIR)
