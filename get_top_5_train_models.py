@@ -147,8 +147,8 @@ for i in list_top_models:
     print_model(i)
 
 
-# plot_mean_rewards(agent, FIGURES_DIR)
-# plot_mean_episode_length(agent, FIGURES_DIR)
-# plot_raw_episode_rewards(agent, FIGURES_DIR)
+plot_mean_rewards(agent, FIGURES_DIR)
+plot_mean_episode_length(agent, FIGURES_DIR)
+plot_raw_episode_rewards(agent, FIGURES_DIR)
 
 

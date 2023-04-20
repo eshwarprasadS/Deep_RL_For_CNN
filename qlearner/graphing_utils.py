@@ -23,21 +23,21 @@ def smooth(scalars, weight=0.9):  # Weight between 0 and 1
     return smoothed
 
 def plot_mean_rewards(agent, figures_dir):
-    plt.rcParams["font.size"] = "16"
+    plt.rcParams["font.size"] = "14"
     plt.figure()
     x = [(i+1)*np.mean(agent.ep_len) for i in np.arange(len(agent.ep_rewards))]
     y = running_average(agent.ep_rewards)
     
     plt.plot(x, y, alpha=0.3)
     plt.plot(x, smooth(y, .9))
-    plt.xlabel('iterations')
+    plt.xlabel('iterations (total actions)')
     plt.ylabel('mean episode reward')
     plt.title('mean episode reward')
     plt.legend(["mean ep rewards", "mean ep rewards smoothed"], loc = 'lower right')
     plt.savefig(os.path.join(figures_dir,f'qlearner_{len(agent.ep_rewards)}_mean_rewards.pdf'))
 
 def plot_mean_episode_length(agent, figures_dir):
-    plt.rcParams["font.size"] = "16"
+    plt.rcParams["font.size"] = "14"
     plt.figure()
     x = [(i+1)*np.mean(agent.ep_len) for i in np.arange(len(agent.ep_rewards))]
     y = running_average(agent.ep_len)
