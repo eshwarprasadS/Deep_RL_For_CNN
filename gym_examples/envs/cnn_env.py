@@ -3,7 +3,7 @@ from gym import spaces
 import pygame
 import numpy as np
 import math
-from gym_examples.envs.pytorch_parser.pytorch_parser_function import generate_and_train
+from gym_examples.envs.pytorch_parser.pytorch_parser_function import n_params, GenerateCNN, generate_and_train
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import torch
@@ -486,6 +486,39 @@ class CNNEnv(gym.Env):
             "pool_stride": self._discrete_to_pool_size[action[self._state_elem_to_index["pool_size_and_stride"]]][1],
         }
 
+        # NOTE: VARIABLES FOR LAYER SIZE CALL #######################################
+        running_image_size=self.current_image_size
+        print('RUNNING IMAGE SIZE:', running_image_size)
+        input_channels, input_image_size=1,28
+        if "cifar" in self.dataset:
+            input_channels, input_image_size=3,32
+
+
+        if len(self.current_state)==1:
+            in_filter=input_channels
+        else:
+            prev_layer=self.current_state[-1]
+            if prev_layer['layer_type']=='pool':
+                prev_layer=self.current_state[-2]
+            
+            in_filter=prev_layer['filter_depth']
+        
+        print('INFILTER',in_filter)
+
+        firstFC=False
+        running_fc_size=None
+        if layer["layer_type"] == "fc":
+            if self.current_state[-1]['layer_type'] != "fc":
+                # this means layer is the first fc layer TODO: CHECK
+                firstFC=True
+                running_fc_size=running_image_size**2
+                running_fc_size*=in_filter
+            else:
+                running_fc_size=self.current_state[-1]['fc_size']
+
+        print('FC SIZE',running_fc_size)
+
+        #################################################################################
 
         if layer["layer_type"] == "conv" or layer["layer_type"] == "pool":
             self.current_image_size = self._calculate_image_size(self.current_image_size,
@@ -503,6 +536,29 @@ class CNNEnv(gym.Env):
             self.cur_num_fc_layers += 1
 
         self.current_state.append(layer)
+        
+        if layer["layer_type"] == "conv":
+            layer_tuple=(layer["layer_type"],
+                            layer["layer_depth"],
+                            layer["filter_depth"],
+                            layer["filter_size"],
+                            1, # stride hardcoded to 1 for conv
+                            layer["image_size"],
+                            layer["fc_size"],
+                            0,
+                            []
+                            )
+        else:
+            layer_tuple=(layer["layer_type"],
+                            layer["layer_depth"],
+                            layer["filter_depth"],
+                            layer["pool_size"],
+                            layer["pool_stride"],
+                            layer["image_size"],
+                            layer["fc_size"],
+                            0,
+                            []
+                            )
         # self.current_state.append({
 
         #     "layer_type": self._discrete_to_layer_type[action[self._state_elem_to_index["layer_type"]]], # conv, pool, fc
@@ -579,7 +635,8 @@ class CNNEnv(gym.Env):
                 print('reward =', reward)
 
         else:
-            reward = 0     
+            reward = n_params(GenerateCNN._generate_layer(layer_tuple, running_image_size, in_filter, firstFC, running_fc_size))
+            # reward = 0     
             self.model_size = 0       
         observation = self._get_obs()
         info = self._get_info()

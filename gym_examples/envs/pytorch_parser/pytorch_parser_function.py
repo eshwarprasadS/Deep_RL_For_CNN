@@ -122,6 +122,33 @@ class GenerateCNN(nn.Module):
 
 
       # https://github.com/bowenbaker/metaqnn/blob/a25847f635e9545455f83405453e740646038f7a/libs/grammar/state_enumerator.py#L207
+    
+    
+    @staticmethod
+    def _generate_layer(state, running_image_size, in_filter, firstFC, running_fc_size):
+      # in_filter=None
+      # running_image_size=self.input_image_size
+      # firstFC=True
+      # running_fc_size=None
+
+      layer_type, layer_depth, filter_depth, filter_size, stride, image_size, fc_size, terminate, state_list = state
+      if layer_type=='conv':
+        assert filter_depth != 0, "filter_depth to conv layer must be non-zero"
+        # if i==0:
+        #   return nn.Conv2d(self.n_init_channels,filter_depth, filter_size, stride)
+        #   # self.layers.append()
+        #   # running_image_size=image_size
+        # else:
+        return nn.Conv2d(in_filter,filter_depth, filter_size, stride)
+
+      elif layer_type=='pool':
+        return nn.MaxPool2d(filter_size, stride)
+        
+
+      elif layer_type=='fc':
+
+        return nn.Linear(running_fc_size,fc_size)
+    
     def _calc_new_image_size(self, image_size, filter_size, stride):
       '''Returns new image size given previous image size and filter parameters'''
       new_size = int(math.ceil(float(image_size - filter_size + 1) / float(stride)))
@@ -280,3 +307,7 @@ if __name__=="__main__":
   # generate_and_train(  [('conv', 1, 20, 3, 1, 26, 0, 0, []), ('pool', 2, 20, 2, 2, 13, 512, 0, []), ('conv', 3, 32, 3, 1, 11, 512, 0, []), ('fc', 4, 10, 3, 2, 11, 64, 0, [])],
   #                       cifar_trainset, cifar_testset, dataset_name='cifar', n_classes=10, num_epochs=1, verbose=True, data_path=".", run_name="1")
   
+  # generate_and_train(  [('conv', 1, 20, 3, 1, 32, 0,0,[]),('conv', 2, 10, 5, 1, 30, 0,0,[]),('pool', 3, 0, 2, 2, 111, 0,0,[]),('fc', 4, 20, 3, 1, 111, 512,1,[])],
+  #                       cifar_trainset, cifar_testset, dataset_name='cifar', n_classes=10, num_epochs=1, verbose=True, data_path=".", run_name="1")
+  
+
