@@ -635,8 +635,8 @@ class CNNEnv(gym.Env):
                 print('reward =', reward)
 
         else:
-            reward = n_params(GenerateCNN._generate_layer(layer_tuple, running_image_size, in_filter, firstFC, running_fc_size))
-            # reward = 0     
+            # reward = n_params(GenerateCNN._generate_layer(layer_tuple, running_image_size, in_filter, firstFC, running_fc_size))
+            reward = 0     
             self.model_size = 0       
         observation = self._get_obs()
         info = self._get_info()
