@@ -628,9 +628,14 @@ class CNNEnv(gym.Env):
             if self.dataset == "mnist":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3, verbose=True)
                 self.model_size = model_size
+                penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
+                reward = reward - penalty
             elif self.dataset == "cifar":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
+                penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
+                reward = reward - penalty
                 self.model_size = model_size
+                print('reward =', reward, 'penalty = ', penalty, 'model_size =', model_size)
             if self.verbose:
                 print('reward =', reward)
 
