@@ -58,18 +58,18 @@ class CNNEnv(gym.Env):
                                 train = False,
                                 transform = ToTensor()
                                 )
-            subset_targets = [0, 1, 2, 3, 4]
+            # subset_targets = [0, 1, 2, 3, 4]
 
-            self.train_data.targets = np.array(self.train_data.targets)
-            self.test_data.targets = np.array(self.test_data.targets)
+            # self.train_data.targets = np.array(self.train_data.targets)
+            # self.test_data.targets = np.array(self.test_data.targets)
 
-            train_idx = np.isin(self.train_data.targets, subset_targets)
-            test_idx = np.isin(self.test_data.targets, subset_targets)
+            # train_idx = np.isin(self.train_data.targets, subset_targets)
+            # test_idx = np.isin(self.test_data.targets, subset_targets)
 
-            self.train_data.data = self.train_data.data[train_idx]
-            self.train_data.targets = torch.from_numpy(self.train_data.targets[train_idx]).type(torch.LongTensor)
-            self.test_data.data = self.test_data.data[test_idx]
-            self.test_data.targets = torch.from_numpy(self.test_data.targets[test_idx]).type(torch.LongTensor)
+            # self.train_data.data = self.train_data.data[train_idx]
+            # self.train_data.targets = torch.from_numpy(self.train_data.targets[train_idx]).type(torch.LongTensor)
+            # self.test_data.data = self.test_data.data[test_idx]
+            # self.test_data.targets = torch.from_numpy(self.test_data.targets[test_idx]).type(torch.LongTensor)
 
         self.layer_depth_limit = 8
         self.model_size = 0
@@ -628,14 +628,14 @@ class CNNEnv(gym.Env):
             if self.dataset == "mnist":
                 reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=3, verbose=True)
                 self.model_size = model_size
-                penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
-                reward = reward - penalty
+                # penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
+                # reward = reward - penalty
             elif self.dataset == "cifar":
-                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=5)
-                penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
-                reward = reward - penalty
+                reward, model_size = generate_and_train(layersList, self.train_data, self.test_data, data_path=self.cnn_save_dir, run_name=self.run_name, dataset_name=self.dataset, n_classes=10)
+                # penalty = 0.001*(model_size/np.exp(8) + np.log10(model_size))
+                # reward = reward - penalty
                 self.model_size = model_size
-                print('reward =', reward, 'penalty = ', penalty, 'model_size =', model_size)
+                # print('reward =', reward, 'penalty = ', penalty, 'model_size =', model_size)
             if self.verbose:
                 print('reward =', reward)
 
