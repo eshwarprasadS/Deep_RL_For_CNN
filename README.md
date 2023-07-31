@@ -18,3 +18,14 @@ in [MetaQNN](https://bowenbaker.github.io/metaqnn/) (Baker et al., 2017) and ada
 it to fit our computation restrictions.
 
 ![alt text](CNN_RL.png)
+
+### The State Space
+Each state in the MDP is a single layer represented
+as a tuple with information about layer type, its
+depth in the network and its associated hyperparameters.
+Although the formulation is extensible
+to all types of layers, we restrict our experiments
+to convolution (’conv’), pooling (’pool’) and fully
+connected (’fc’) layers.
+
+![state_and_action_space](state_action_space_parameters.png)
