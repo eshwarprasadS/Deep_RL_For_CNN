@@ -19,7 +19,7 @@ it to fit our computation restrictions.
 
 ![alt text](CNN_RL.png)
 
-### The State Space
+## The State Space
 Each state in the MDP is a single layer represented
 as a tuple with information about layer type, its
 depth in the network and its associated hyperparameters.
@@ -30,14 +30,14 @@ connected (’fc’) layers.
 
 ![state_and_action_space](state_action_space_params.PNG)
 
-### The Action Space
+## The Action Space
 Actions are represented as similar tuples to states,
 encapsulating information about the next layer to
 be added. We manipulate the action space to restrict
 possible actions from a given state to ensure
 that sampled trajectories are always valid networks.
 
-### Rewards
+## Rewards
 We consider two types of rewards to optimize for,
 on reaching the terminal state:
 
@@ -58,7 +58,7 @@ normalizing the penalty to the same scale as
 accuracy.
 
 # Experimental Setup
-### Dataset
+## Dataset
 
 ![datasets](datasets.PNG)
 
@@ -68,7 +68,7 @@ involves training several thousand CNNs. This restricts
 the scope of our experiments, mainly due to
 computation limitations.
 
-### MDP Implementation
+## MDP Implementation
 The CNN-MDP environment is designed with [OpenAI
 Gym](https://www.gymlibrary.dev/) (Brockman et al., 2016). The states and
 actions in the environment are designed as a tuple
@@ -85,7 +85,7 @@ listed in table 3.
 
 ![cnn_params](cnn_params.PNG)
 
-### Reward-wise Experiments
+## Reward-wise Experiments
 As our pilot experiment, we chose to start experimentation
 with MNIST-3. Results (table 4) shed
 light on the intuition that more complex models do
