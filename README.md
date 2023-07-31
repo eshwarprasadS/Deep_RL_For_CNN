@@ -47,8 +47,7 @@ classification problem and the validation accuracy
 of this procedure is given to the agent
 as terminal reward.
 
-  2. Model Size Based Penalty: Motivated by
-results in section 5.1.2, we propose a minor
+  2. Model Size Based Penalty: We also propose a minor
 penalty to be deducted from the accuracy.
 Penalty P for a given model with x trainable
 parameters is calculated as:
@@ -57,3 +56,14 @@ where δ is a small constant (e−8) which preserves
 linearity and β is a scale parameter,
 normalizing the penalty to the same scale as
 accuracy.
+
+# Experimental Setup
+### Dataset
+
+![datasets](datasets.png)
+
+To put into context our choice of datasets, it is noteworthy
+to mention that the training of our RL agent
+involves training several thousand CNNs. This restricts
+the scope of our experiments, mainly due to
+computation limitations.
