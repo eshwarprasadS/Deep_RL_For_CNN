@@ -86,11 +86,21 @@ listed in table 3.
 ![cnn_params](cnn_params.PNG)
 
 ## Reward-wise Experiments
+
+![mnist_results](mnist_results.PNG)
+
 As our pilot experiment, we chose to start experimentation
 with MNIST-3. Results (table 4) shed
 light on the intuition that more complex models do
 not necessarily lead to better accuracy and that it
 is possible to achieve comparable accuracy with
 much smaller CNNs. This lead us to design two
-new sets of experiments.
-![mnist_results](mnist_results.PNG)
+new sets of experiments:
+
+  1. The first setting
+(without penalties), which will henceforth be addressed as
+the CIFAR-5 Main Experiment
+
+  2. The latter with penalties, which will be
+addressed as CIFAR-5 Penalized Experiment
+
