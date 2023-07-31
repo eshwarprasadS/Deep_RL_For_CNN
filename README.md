@@ -101,6 +101,6 @@ new sets of experiments:
 (without penalties), which will henceforth be addressed as
 the CIFAR-5 Main Experiment
 
-  2. The latter with penalties, which will be
+  2. With penalties, which will be
 addressed as CIFAR-5 Penalized Experiment
 
