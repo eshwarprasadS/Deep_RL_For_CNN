@@ -67,3 +67,20 @@ to mention that the training of our RL agent
 involves training several thousand CNNs. This restricts
 the scope of our experiments, mainly due to
 computation limitations.
+
+### MDP Implementation
+The CNN-MDP environment is designed with [OpenAI
+Gym](https://www.gymlibrary.dev/) (Brockman et al., 2016). The states and
+actions in the environment are designed as a tuple
+of 7 discrete dimensions, as described in Table 1.
+The environment uses invalid action masking to
+present a binary mask (with 1’s representing valid
+actions) to the agent at every timestep t.
+At the end of every episode, the generated trajectory
+is parsed as a CNN and is trained using
+PyTorch. The resultant validation accuracy is returned
+to the agent as the reward for the episode.
+Hyperparameters for this training procedure are
+listed in table 3.
+
+![cnn_params](cnn_params.PNG)
