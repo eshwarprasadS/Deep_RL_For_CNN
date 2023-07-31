@@ -28,4 +28,32 @@ to all types of layers, we restrict our experiments
 to convolution (’conv’), pooling (’pool’) and fully
 connected (’fc’) layers.
 
-![state_and_action_space](state_action_space_parameters.png)
+![state_and_action_space](state_action_space_params.PNG)
+
+### The Action Space
+Actions are represented as similar tuples to states,
+encapsulating information about the next layer to
+be added. We manipulate the action space to restrict
+possible actions from a given state to ensure
+that sampled trajectories are always valid networks.
+
+### Rewards
+We consider two types of rewards to optimize for,
+on reaching the terminal state:
+
+  1. Accuracy: The CNN architecture represented
+by the agent’s trajectory is trained on an image
+classification problem and the validation accuracy
+of this procedure is given to the agent
+as terminal reward.
+
+  2. Model Size Based Penalty: Motivated by
+results in section 5.1.2, we propose a minor
+penalty to be deducted from the accuracy.
+Penalty P for a given model with x trainable
+parameters is calculated as:
+P = β(δ · x + log(x))
+where δ is a small constant (e−8) which preserves
+linearity and β is a scale parameter,
+normalizing the penalty to the same scale as
+accuracy.
