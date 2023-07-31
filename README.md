@@ -60,7 +60,7 @@ accuracy.
 # Experimental Setup
 ### Dataset
 
-![datasets](datasets.png)
+![datasets](datasets.PNG)
 
 To put into context our choice of datasets, it is noteworthy
 to mention that the training of our RL agent
