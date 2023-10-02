@@ -198,7 +198,7 @@ on conventional wisdom. We offer our ideas as
 extensions to networks in research settings with
 ample time and resources.
 
-## FutureWork
+## Future Work
 There are several avenues for future research based
 on environment restrictions to the search space,
 some of which include: 
