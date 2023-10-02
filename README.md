@@ -104,3 +104,123 @@ the CIFAR-5 Main Experiment
   2. With penalties, which will be
 addressed as CIFAR-5 Penalized Experiment
 
+## RL Methods and Implementation
+
+### Q-Learning
+
+![eps_schedule](eps_schedule_minimetaqnn_cifar5.PNG)
+
+For Mini-MetaQNN, we use the same learning rate
+(α = 0.01) and discount factor (γ = 1) as in MetaQNN. The epsilon
+schedule is described in table 5. We sample 30
+replays from the replay memory at the end of every
+episode to update Q-values.
+
+### PPO
+
+We make use of Stable-baselines3 framework 
+to implement the PPO agent for
+our method. We use num_steps = 64 as the update
+frequency for PPO and run it until convergence for
+every experiment. We use a learning rate of 0.0003,
+batch size of 64, with an ϵ for clip range of 0.2.
+
+## Results, Insights & Discussion
+
+### CIFAR-5 Main Experiment
+
+![eps_schedule](eval_acc_cifar5_main.PNG)
+
+Once trained, we generate 50 models with
+no Q-value or policy updates and report the mean
+accuracy in table 6. We observe that our method
+outperforms the baseline, with comparatively less
+variance. Further, we visualize the network designed
+by the ’optimal policy’ that each of the
+agents converged at respectively in figure 4.
+
+![eps_schedule](best_eval_model_cifar5_main.PNG)
+
+### CIFAR-5 Penalized Experiment
+
+The main objective of this experiment is to assess
+the effect of reward shaping strategies in the context
+of building neural networks using RL. We drive our
+focus towards the differences and improvements
+of the results in terms model performance-model
+complexity tradeoff.
+
+![eps_schedule](best_eval_model_cifar5_penalized.PNG)
+
+
+In this experiment, we notice a significant improvement in terms of model complexity,
+especially with the Mini-MetaQNN agent.
+The mean of model size (in terms of number of
+trainable parameters) dropped by two orders of
+magnitude while maintaining similar ranges of accuracy
+(tables 6 and 9). 
+
+## CIFAR-10
+
+![eps_schedule](eval_acc_cifar10.PNG)
+
+As an extended study we choose to apply the main
+experiment to the entirety of CIFAR-10 dataset.
+Since this is a comparatively more complex classification
+task with twice the size of data, we hold
+tempered expectations for accuracy. Our method
+outperforms the reproduced baseline by
+a valid margin, with significantly less variance during
+test time. 
+
+## Limitations
+
+1. We highlight that the MDP implementation and
+experiments are limited by the computational resources
+available to us
+
+2. We limit the maximum
+depth of a network to 8 (against 12 in the original
+baseline), and the number of FC layers to 2.
+
+3. the MDP is restrictive by design, allowing
+only for specific architectures to be created.
+Owing to the lack of concepts such as skip connections,
+ResNet-like networks cannot be created,
+which may perform significantly better on image
+classification tasks.
+
+4. Finally, designing specific MDPs and associated
+rewards for different type of tasks is cumbersome,
+from a practicality standpoint. We acknowledge
+that, for practical purposes, one is better off relying
+on conventional wisdom. We offer our ideas as
+extensions to networks in research settings with
+ample time and resources.
+
+## FutureWork
+There are several avenues for future research based
+on environment restrictions to the search space,
+some of which include: 
+
+1. Adding convolutional stride
+as a configurable parameter and considering more diverse
+layer types (e.g. global average pooling, attention),
+allowing more FC layers per model and
+consecutive pooling layers.
+
+2. The environment can also be extended by including
+hyperparameters of the CNN training process
+(learning rate, batch size, optimizer etc.) into the
+search space.
+
+3. Another significant area of extension
+is to allow different types of neural networks depending
+upon the downstream task, such as RNNs
+for sequential or time-series data and transformer
+blocks for more complex tasks.
+
+4. Lastly, alternative
+RL paradigms can be explored such as Deep QNetworks
+to estimate a state-value function instead
+of direct policy estimation.
