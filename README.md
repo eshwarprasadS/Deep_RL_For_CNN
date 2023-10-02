@@ -129,7 +129,7 @@ batch size of 64, with an ϵ for clip range of 0.2.
 
 ### CIFAR-5 Main Experiment
 
-![eps_schedule](eval_acc_cifar5_main.PNG)
+![eval_acc](eval_acc_cifar5_main.PNG)
 
 Once trained, we generate 50 models with
 no Q-value or policy updates and report the mean
@@ -139,7 +139,7 @@ variance. Further, we visualize the network designed
 by the ’optimal policy’ that each of the
 agents converged at respectively in figure 4.
 
-![eps_schedule](best_eval_model_cifar5_main.PNG)
+![best_model](best_eval_model_cifar5_main.PNG)
 
 ### CIFAR-5 Penalized Experiment
 
@@ -150,7 +150,7 @@ focus towards the differences and improvements
 of the results in terms model performance-model
 complexity tradeoff.
 
-![eps_schedule](best_eval_model_cifar5_penalized.PNG)
+![eval_acc](eval_acc_cifar5_penalized.PNG)
 
 
 In this experiment, we notice a significant improvement in terms of model complexity,
@@ -162,7 +162,7 @@ magnitude while maintaining similar ranges of accuracy
 
 ## CIFAR-10
 
-![eps_schedule](eval_acc_cifar10.PNG)
+![eval_acc](eval_acc_cifar10.PNG)
 
 As an extended study we choose to apply the main
 experiment to the entirety of CIFAR-10 dataset.
@@ -175,22 +175,22 @@ test time.
 
 ## Limitations
 
-1. We highlight that the MDP implementation and
+- We highlight that the MDP implementation and
 experiments are limited by the computational resources
 available to us
 
-2. We limit the maximum
+- We limit the maximum
 depth of a network to 8 (against 12 in the original
 baseline), and the number of FC layers to 2.
 
-3. the MDP is restrictive by design, allowing
+- The MDP is restrictive by design, allowing
 only for specific architectures to be created.
 Owing to the lack of concepts such as skip connections,
 ResNet-like networks cannot be created,
 which may perform significantly better on image
 classification tasks.
 
-4. Finally, designing specific MDPs and associated
+- Finally, designing specific MDPs and associated
 rewards for different type of tasks is cumbersome,
 from a practicality standpoint. We acknowledge
 that, for practical purposes, one is better off relying
@@ -203,24 +203,23 @@ There are several avenues for future research based
 on environment restrictions to the search space,
 some of which include: 
 
-1. Adding convolutional stride
+- Adding convolutional stride
 as a configurable parameter and considering more diverse
 layer types (e.g. global average pooling, attention),
 allowing more FC layers per model and
 consecutive pooling layers.
 
-2. The environment can also be extended by including
+- The environment can also be extended by including
 hyperparameters of the CNN training process
 (learning rate, batch size, optimizer etc.) into the
 search space.
-
-3. Another significant area of extension
+- Another significant area of extension
 is to allow different types of neural networks depending
 upon the downstream task, such as RNNs
 for sequential or time-series data and transformer
 blocks for more complex tasks.
 
-4. Lastly, alternative
+- Lastly, alternative
 RL paradigms can be explored such as Deep QNetworks
 to estimate a state-value function instead
 of direct policy estimation.
